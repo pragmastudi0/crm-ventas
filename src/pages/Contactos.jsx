@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
@@ -35,10 +36,19 @@ export default function Contactos() {
   });
 
   const queryClient = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
 
   const { data: contactos = [], refetch } = useQuery({
-    queryKey: ['contactos'],
-    queryFn: () => base44.entities.Contacto.list("-created_date", 500)
+    queryKey: ['contactos', currentUser?.email],
+    queryFn: async () => {
+      const allContactos = await base44.entities.Contacto.list("-created_date", 500);
+      if (!currentUser) return [];
+      if (currentUser.viewAllData) {
+        return allContactos;
+      }
+      return allContactos.filter(c => c.created_by === currentUser.email);
+    },
+    enabled: !!currentUser
   });
 
   const { data: consultas = [] } = useQuery({
@@ -165,10 +175,12 @@ export default function Contactos() {
             <h1 className="text-2xl font-bold text-slate-900">Contactos</h1>
             <p className="text-slate-500">{contactosFiltrados.length} contactos</p>
           </div>
-          <Button onClick={() => { resetForm(); setShowForm(true); }} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nuevo contacto
-          </Button>
+          {currentUser?.canEditContacts && (
+            <Button onClick={() => { resetForm(); setShowForm(true); }} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nuevo contacto
+            </Button>
+          )}
         </div>
 
         {/* Filtros */}
@@ -262,14 +274,16 @@ export default function Contactos() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0"
-                        onClick={() => handleEdit(contacto)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
+                      {currentUser?.canEditContacts && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleEdit(contacto)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         className="bg-[#25D366] hover:bg-[#20bd5a] text-white h-8 w-8 p-0"
@@ -280,18 +294,20 @@ export default function Contactos() {
                       >
                         <MessageCircle className="w-4 h-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
-                        onClick={() => {
-                          if (window.confirm("¿Estás seguro de eliminar este contacto?")) {
-                            deleteMutation.mutate(contacto.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {currentUser?.canEditContacts && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
+                          onClick={() => {
+                            if (window.confirm("¿Estás seguro de eliminar este contacto?")) {
+                              deleteMutation.mutate(contacto.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
@@ -54,10 +55,20 @@ export default function Plantillas() {
   });
 
   const queryClient = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
 
   const { data: plantillas = [], refetch } = useQuery({
-    queryKey: ['plantillas'],
-    queryFn: () => base44.entities.PlantillaWhatsApp.list("-created_date")
+    queryKey: ['plantillas', currentUser?.email],
+    queryFn: async () => {
+      const allPlantillas = await base44.entities.PlantillaWhatsApp.list("-created_date");
+      if (!currentUser) return [];
+      // Si el usuario puede ver todo, mostrar todas; si no, solo las suyas
+      if (currentUser.viewAllData) {
+        return allPlantillas;
+      }
+      return allPlantillas.filter(p => p.created_by === currentUser.email);
+    },
+    enabled: !!currentUser
   });
 
   const { data: variablesDB = [] } = useQuery({
@@ -178,10 +189,12 @@ export default function Plantillas() {
               </Button>
             </Link>
           </div>
-          <Button onClick={() => { resetForm(); setShowForm(true); }} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nueva plantilla
-          </Button>
+          {currentUser?.canEditTemplates && (
+            <Button onClick={() => { resetForm(); setShowForm(true); }} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nueva plantilla
+            </Button>
+          )}
         </div>
 
         {/* Grid de plantillas */}
@@ -205,22 +218,26 @@ export default function Plantillas() {
                     >
                       <Eye className="w-4 h-4" />
                     </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8"
-                      onClick={() => handleEdit(plantilla)}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-red-500 hover:text-red-600"
-                      onClick={() => deleteMutation.mutate(plantilla.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {currentUser?.canEditTemplates && (
+                      <>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => handleEdit(plantilla)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-red-500 hover:text-red-600"
+                          onClick={() => deleteMutation.mutate(plantilla.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">

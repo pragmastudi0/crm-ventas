@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
@@ -47,10 +48,19 @@ export default function Consultas() {
   const [sortOrder, setSortOrder] = useState("desc");
 
   const queryClient = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
 
   const { data: consultas = [], refetch, isLoading } = useQuery({
-    queryKey: ['consultas-list'],
-    queryFn: () => base44.entities.Consulta.list("-created_date", 500)
+    queryKey: ['consultas-list', currentUser?.email],
+    queryFn: async () => {
+      const allConsultas = await base44.entities.Consulta.list("-created_date", 500);
+      if (!currentUser) return [];
+      if (currentUser.viewAllData) {
+        return allConsultas;
+      }
+      return allConsultas.filter(c => c.created_by === currentUser.email);
+    },
+    enabled: !!currentUser
   });
 
   const updateMutation = useMutation({
@@ -157,10 +167,12 @@ export default function Consultas() {
               <h1 className="text-2xl font-bold text-slate-900">Consultas</h1>
               <p className="text-slate-500">{consultasFiltradas.length} resultados</p>
             </div>
-            <Button onClick={() => { setSelectedConsulta(null); setShowForm(true); }} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Nueva consulta
-            </Button>
+            {currentUser?.canEditContacts && (
+              <Button onClick={() => { setSelectedConsulta(null); setShowForm(true); }} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Nueva consulta
+              </Button>
+            )}
           </div>
 
           {/* Filtros */}
@@ -307,13 +319,15 @@ export default function Consultas() {
                     </TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
-                        <Button
-                          size="sm"
-                          onClick={() => handleWhatsApp(consulta)}
-                          className="bg-[#25D366] hover:bg-[#20bd5a] text-white h-8 w-8 p-0"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                        </Button>
+                        {currentUser?.canSendMessages && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleWhatsApp(consulta)}
+                            className="bg-[#25D366] hover:bg-[#20bd5a] text-white h-8 w-8 p-0"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                          </Button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
