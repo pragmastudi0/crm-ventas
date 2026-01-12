@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import Hoy from './pages/Hoy';
 import Reportes from './pages/Reportes';
 import Ajustes from './pages/Ajustes';
+import Variables from './pages/Variables';
 import __Layout from './Layout.jsx';
 
 
@@ -20,6 +21,7 @@ export const PAGES = {
     "Hoy": Hoy,
     "Reportes": Reportes,
     "Ajustes": Ajustes,
+    "Variables": Variables,
 }
 
 export const pagesConfig = {

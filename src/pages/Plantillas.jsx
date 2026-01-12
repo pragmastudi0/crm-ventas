@@ -60,6 +60,11 @@ export default function Plantillas() {
     queryFn: () => base44.entities.PlantillaWhatsApp.list("-created_date")
   });
 
+  const { data: variablesDB = [] } = useQuery({
+    queryKey: ['variables'],
+    queryFn: () => base44.entities.VariablePlantilla.list()
+  });
+
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.PlantillaWhatsApp.create(data),
     onSuccess: () => {
@@ -130,9 +135,18 @@ export default function Plantillas() {
 
   const reemplazarVariables = (texto) => {
     let result = texto;
-    Object.entries(DATOS_PRUEBA).forEach(([key, value]) => {
-      result = result.replace(new RegExp(key, 'g'), value);
+    
+    // Primero usar variables de la BD
+    variablesDB.forEach(variable => {
+      const key = `{${variable.clave}}`;
+      result = result.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), variable.valor);
     });
+    
+    // Luego usar los datos de prueba por defecto para las que falten
+    Object.entries(DATOS_PRUEBA).forEach(([key, value]) => {
+      result = result.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
+    });
+    
     return result;
   };
 
@@ -157,6 +171,12 @@ export default function Plantillas() {
             </Link>
             <h1 className="text-2xl font-bold text-slate-900">Plantillas WhatsApp</h1>
             <p className="text-slate-500">Gestiona tus mensajes predefinidos</p>
+            <Link to={createPageUrl("Variables")}>
+              <Button variant="link" className="gap-2 p-0 h-auto mt-1">
+                <Sparkles className="w-4 h-4" />
+                Configurar variables
+              </Button>
+            </Link>
           </div>
           <Button onClick={() => { resetForm(); setShowForm(true); }} className="gap-2">
             <Plus className="w-4 h-4" />
