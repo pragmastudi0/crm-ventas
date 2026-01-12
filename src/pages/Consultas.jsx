@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import moment from "moment";
 import ConsultaForm from "@/components/crm/ConsultaForm";
 import WhatsAppSender from "@/components/crm/WhatsAppSender";
+import DetalleConsultaDialog from "@/components/crm/DetalleConsultaDialog";
 import { toast } from "sonner";
 
 const etapaColors = {
@@ -39,6 +40,7 @@ const prioridadColors = {
 export default function Consultas() {
   const [showForm, setShowForm] = useState(false);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
+  const [showDetalleDialog, setShowDetalleDialog] = useState(false);
   const [selectedConsulta, setSelectedConsulta] = useState(null);
   const [search, setSearch] = useState("");
   const [filtroEtapa, setFiltroEtapa] = useState("todas");
@@ -260,7 +262,10 @@ export default function Consultas() {
                   <TableRow 
                     key={consulta.id} 
                     className="cursor-pointer hover:bg-slate-50"
-                    onClick={() => handleEdit(consulta)}
+                    onClick={() => {
+                      setSelectedConsulta(consulta);
+                      setShowDetalleDialog(true);
+                    }}
                   >
                     <TableCell>
                       <div>
@@ -423,6 +428,13 @@ export default function Consultas() {
         onOpenChange={setShowWhatsApp}
         consulta={selectedConsulta}
         onMessageSent={refetch}
+      />
+
+      <DetalleConsultaDialog
+        consulta={selectedConsulta}
+        open={showDetalleDialog}
+        onOpenChange={setShowDetalleDialog}
+        onSave={refetch}
       />
     </div>
   );

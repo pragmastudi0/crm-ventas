@@ -16,11 +16,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Search, Edit, Phone, MessageCircle, MapPin, User, Tag, ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import moment from "moment";
+import DetalleContactoDialog from "@/components/crm/DetalleContactoDialog";
 
 const CANALES = ["Instagram", "WhatsApp", "MercadoLibre", "Referido", "Local", "Otro"];
 
 export default function Contactos() {
   const [showForm, setShowForm] = useState(false);
+  const [showDetalleDialog, setShowDetalleDialog] = useState(false);
   const [selectedContacto, setSelectedContacto] = useState(null);
   const [search, setSearch] = useState("");
   const [filtroCanal, setFiltroCanal] = useState("todos");
@@ -279,7 +281,10 @@ export default function Contactos() {
                           size="sm"
                           variant="ghost"
                           className="h-8 w-8 p-0"
-                          onClick={() => handleEdit(contacto)}
+                          onClick={() => {
+                            setSelectedContacto(contacto);
+                            setShowDetalleDialog(true);
+                          }}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
@@ -403,6 +408,12 @@ export default function Contactos() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DetalleContactoDialog
+        contacto={selectedContacto}
+        open={showDetalleDialog}
+        onOpenChange={setShowDetalleDialog}
+      />
     </div>
   );
 }
