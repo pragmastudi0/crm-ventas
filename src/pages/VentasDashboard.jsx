@@ -23,11 +23,11 @@ export default function VentasDashboard() {
 
   // Ganancia por Proveedor
   const gananciasPorProveedor = ventas.reduce((acc, venta) => {
-    if (!venta.proveedor) return acc;
-    if (!acc[venta.proveedor]) {
-      acc[venta.proveedor] = 0;
+    if (!venta.proveedorNombreSnapshot) return acc;
+    if (!acc[venta.proveedorNombreSnapshot]) {
+      acc[venta.proveedorNombreSnapshot] = 0;
     }
-    acc[venta.proveedor] += venta.ganancia || 0;
+    acc[venta.proveedorNombreSnapshot] += venta.ganancia || 0;
     return acc;
   }, {});
 

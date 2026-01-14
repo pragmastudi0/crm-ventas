@@ -29,7 +29,12 @@ export default function Ventas() {
     queryFn: () => base44.entities.Venta.list("-created_date")
   });
 
-  const proveedoresUnicos = ["Todos", ...new Set(ventas.map(v => v.proveedor).filter(Boolean))];
+  const { data: proveedores = [] } = useQuery({
+    queryKey: ['proveedores'],
+    queryFn: () => base44.entities.Proveedor.list()
+  });
+
+  const proveedoresUnicos = ["Todos", ...new Set(ventas.map(v => v.proveedorNombreSnapshot).filter(Boolean))];
 
   const ventasFiltradas = ventas.filter(venta => {
     const matchSearch = !search || 
@@ -38,7 +43,7 @@ export default function Ventas() {
       venta.modelo?.toLowerCase().includes(search.toLowerCase());
     
     const matchMarketplace = filterMarketplace === "Todos" || venta.marketplace === filterMarketplace;
-    const matchProveedor = filterProveedor === "Todos" || venta.proveedor === filterProveedor;
+    const matchProveedor = filterProveedor === "Todos" || venta.proveedorNombreSnapshot === filterProveedor;
     
     const matchFechaDesde = !fechaDesde || new Date(venta.fecha) >= new Date(fechaDesde);
     const matchFechaHasta = !fechaHasta || new Date(venta.fecha) <= new Date(fechaHasta);
@@ -215,7 +220,15 @@ export default function Ventas() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>{venta.proveedor}</TableCell>
+                        <TableCell>
+                          {venta.proveedorId ? (
+                            <Link to={createPageUrl(`ProveedorDetalle?id=${venta.proveedorId}`)} className="hover:underline text-blue-600">
+                              {venta.proveedorNombreSnapshot}
+                            </Link>
+                          ) : (
+                            <span>{venta.proveedorNombreSnapshot}</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="secondary">{venta.marketplace}</Badge>
                         </TableCell>

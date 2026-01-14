@@ -13,6 +13,8 @@ import Variables from './pages/Variables';
 import Ventas from './pages/Ventas';
 import VentaDetalle from './pages/VentaDetalle';
 import VentasDashboard from './pages/VentasDashboard';
+import Proveedores from './pages/Proveedores';
+import ProveedorDetalle from './pages/ProveedorDetalle';
 import __Layout from './Layout.jsx';
 
 
@@ -32,6 +34,8 @@ export const PAGES = {
     "Ventas": Ventas,
     "VentaDetalle": VentaDetalle,
     "VentasDashboard": VentasDashboard,
+    "Proveedores": Proveedores,
+    "ProveedorDetalle": ProveedorDetalle,
 }
 
 export const pagesConfig = {

@@ -131,7 +131,13 @@ export default function VentaDetalle() {
               </div>
               <div>
                 <p className="text-sm text-slate-600 mb-1">Proveedor</p>
-                <p className="font-medium">{venta.proveedor}</p>
+                {venta.proveedorId ? (
+                  <Link to={createPageUrl(`ProveedorDetalle?id=${venta.proveedorId}`)} className="font-medium hover:underline text-blue-600">
+                    {venta.proveedorNombreSnapshot}
+                  </Link>
+                ) : (
+                  <p className="font-medium">{venta.proveedorNombreSnapshot}</p>
+                )}
               </div>
               <div>
                 <p className="text-sm text-slate-600 mb-1">Vendedor</p>

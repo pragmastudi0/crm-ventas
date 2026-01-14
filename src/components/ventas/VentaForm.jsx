@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { DollarSign, TrendingUp } from "lucide-react";
+import { DollarSign, TrendingUp, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { createPageUrl } from "@/utils";
 
 const MARKETPLACES = ["WhatsApp", "Instagram", "MercadoLibre", "Local", "Otro"];
 
@@ -20,7 +22,8 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada 
     modelo: "",
     capacidad: "",
     color: "",
-    proveedor: "",
+    proveedorId: "",
+    proveedorNombreSnapshot: "",
     marketplace: "WhatsApp",
     porUsuarioId: "",
     costo: "",
@@ -31,6 +34,16 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada 
   });
 
   const [gananciaCalculada, setGananciaCalculada] = useState(0);
+  const [searchProveedor, setSearchProveedor] = useState("");
+
+  const { data: proveedores = [] } = useQuery({
+    queryKey: ['proveedores-activos'],
+    queryFn: async () => {
+      const all = await base44.entities.Proveedor.list();
+      return all.filter(p => p.activo !== false);
+    },
+    enabled: open
+  });
 
   useEffect(() => {
     if (consulta && open) {
@@ -42,7 +55,8 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada 
         modelo: consulta.productoConsultado || "",
         capacidad: consulta.variante || "",
         color: "",
-        proveedor: consulta.fuentePrecio || "",
+        proveedorId: "",
+        proveedorNombreSnapshot: consulta.fuentePrecio || "",
         marketplace: consulta.canalOrigen || "WhatsApp",
         porUsuarioId: consulta.created_by || "",
         costo: "",
@@ -51,6 +65,7 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada 
         canje: 0,
         notas: ""
       });
+      setSearchProveedor(consulta.fuentePrecio || "");
     }
   }, [consulta, open]);
 
@@ -65,8 +80,13 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada 
   }, [formData.costo, formData.venta, formData.comision, formData.canje]);
 
   const handleSubmit = async () => {
-    if (!formData.proveedor || !formData.costo || !formData.venta) {
-      toast.error("Proveedor, costo y precio de venta son obligatorios");
+    if (!formData.costo || !formData.venta) {
+      toast.error("Costo y precio de venta son obligatorios");
+      return;
+    }
+
+    if (!formData.proveedorId && !formData.proveedorNombreSnapshot) {
+      toast.error("Selecciona un proveedor o ingresa un nombre");
       return;
     }
 
@@ -103,7 +123,8 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada 
         modelo: formData.modelo,
         capacidad: formData.capacidad,
         color: formData.color,
-        proveedor: formData.proveedor,
+        proveedorId: formData.proveedorId || null,
+        proveedorNombreSnapshot: formData.proveedorNombreSnapshot,
         marketplace: formData.marketplace,
         porUsuarioId: formData.porUsuarioId,
         costo: costo,
@@ -177,31 +198,73 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
               <Label>Proveedor *</Label>
+              <a href={createPageUrl("ProveedorDetalle?id=nuevo")} target="_blank" rel="noopener noreferrer">
+                <Button type="button" variant="outline" size="sm" className="gap-1 h-7 text-xs">
+                  <Plus className="w-3 h-3" />
+                  Crear Nuevo
+                </Button>
+              </a>
+            </div>
+            <Select
+              value={formData.proveedorId}
+              onValueChange={(val) => {
+                const prov = proveedores.find(p => p.id === val);
+                setFormData({ 
+                  ...formData, 
+                  proveedorId: val,
+                  proveedorNombreSnapshot: prov?.nombre || ""
+                });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona un proveedor">
+                  {formData.proveedorId 
+                    ? proveedores.find(p => p.id === formData.proveedorId)?.nombre 
+                    : "Selecciona un proveedor"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {proveedores.map(p => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.nombre}
+                    {p.ciudad && <span className="text-xs text-slate-500"> • {p.ciudad}</span>}
+                  </SelectItem>
+                ))}
+                {proveedores.length === 0 && (
+                  <SelectItem value="none" disabled>
+                    No hay proveedores. Crea uno primero.
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            {!formData.proveedorId && (
               <Input
-                value={formData.proveedor}
-                onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
-                placeholder="Nombre del proveedor"
+                value={formData.proveedorNombreSnapshot}
+                onChange={(e) => setFormData({ ...formData, proveedorNombreSnapshot: e.target.value })}
+                placeholder="O escribe el nombre del proveedor"
+                className="mt-2"
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Marketplace</Label>
-              <Select
-                value={formData.marketplace}
-                onValueChange={(val) => setFormData({ ...formData, marketplace: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MARKETPLACES.map(m => (
-                    <SelectItem key={m} value={m}>{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Marketplace</Label>
+            <Select
+              value={formData.marketplace}
+              onValueChange={(val) => setFormData({ ...formData, marketplace: val })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MARKETPLACES.map(m => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
