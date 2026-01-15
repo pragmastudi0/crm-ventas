@@ -29,7 +29,7 @@ export default function Ventas() {
 
   const { data: ventas = [], isLoading } = useQuery({
     queryKey: ['ventas'],
-    queryFn: () => base44.entities.Venta.list("-created_date")
+    queryFn: () => base44.entities.Venta.list("-fecha")
   });
 
   const { data: proveedores = [] } = useQuery({
