@@ -110,7 +110,7 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
   } catch (error) {
     console.error("Error al registrar envío:", error);
   }
-};
+  };
 
   const handleMarkSent = async () => {
     setLoading(true);
