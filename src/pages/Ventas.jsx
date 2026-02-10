@@ -58,6 +58,17 @@ export default function Ventas() {
 
   const totalVentas = ventasFiltradas.reduce((acc, v) => acc + (v.venta || 0), 0);
   const totalGanancia = ventasFiltradas.reduce((acc, v) => acc + (v.ganancia || 0), 0);
+  
+  // Ganancia del mes actual
+  const hoy = new Date();
+  const mesActual = hoy.getMonth();
+  const añoActual = hoy.getFullYear();
+  const ventasMesActual = ventas.filter(v => {
+    if (!v.fecha || v.estado !== "Finalizada") return false;
+    const fechaVenta = new Date(v.fecha);
+    return fechaVenta.getMonth() === mesActual && fechaVenta.getFullYear() === añoActual;
+  });
+  const gananciaMesActual = ventasMesActual.reduce((acc, v) => acc + (v.ganancia || 0), 0);
 
   return (
     <div className="min-h-screen bg-slate-50/50 p-6">
@@ -124,8 +135,9 @@ export default function Ventas() {
                   <DollarSign className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-600">Total Ventas</p>
-                  <p className="text-2xl font-bold">US$ {totalVentas.toFixed(2)}</p>
+                  <p className="text-sm text-slate-600">Ganancia Mes Actual</p>
+                  <p className="text-2xl font-bold text-green-600">US$ {gananciaMesActual.toFixed(2)}</p>
+                  <p className="text-xs text-slate-500">{ventasMesActual.length} ventas</p>
                 </div>
               </div>
             </CardContent>
