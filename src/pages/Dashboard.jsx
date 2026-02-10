@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
   Users, TrendingUp, CheckCircle2, XCircle, Clock, 
-  MessageCircle, Calendar, ArrowRight, Plus, ArrowLeft
+  MessageCircle, Calendar, ArrowRight, Plus, ArrowLeft, DollarSign
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { createPageUrl } from "@/utils";
@@ -28,6 +28,11 @@ export default function Dashboard() {
     queryFn: () => base44.entities.Consulta.list("-created_date", 500)
   });
 
+  const { data: ventas = [] } = useQuery({
+    queryKey: ['ventas-dashboard'],
+    queryFn: () => base44.entities.Venta.list("-fecha", 500)
+  });
+
   // KPIs
   const today = moment();
   const last7Days = consultas.filter(c => moment(c.created_date).isAfter(today.clone().subtract(7, 'days')));
@@ -36,6 +41,12 @@ export default function Dashboard() {
   const perdidos = consultas.filter(c => c.etapa === "Perdido");
   const activos = consultas.filter(c => !["Concretado", "Perdido"].includes(c.etapa));
   const tasaConversion = consultas.length > 0 ? ((concretados.length / consultas.length) * 100).toFixed(1) : 0;
+
+  // Ganancia mensual
+  const ventasMesActual = ventas.filter(v => 
+    v.fecha && moment(v.fecha).isSame(today, 'month') && v.estado === "Finalizada"
+  );
+  const gananciaMensual = ventasMesActual.reduce((acc, v) => acc + (v.ganancia || 0), 0);
 
   // Seguimientos del día
   const seguimientosHoy = consultas.filter(c => 
@@ -100,7 +111,7 @@ export default function Dashboard() {
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <KPICard
             title="Leads últimos 7 días"
             value={last7Days.length}
@@ -112,6 +123,12 @@ export default function Dashboard() {
             value={`${tasaConversion}%`}
             subtitle={`${concretados.length} concretados`}
             icon={TrendingUp}
+          />
+          <KPICard
+            title="Ganancia Mensual"
+            value={`$${gananciaMensual.toFixed(0)}`}
+            subtitle={`${ventasMesActual.length} ventas`}
+            icon={DollarSign}
           />
           <KPICard
             title="Activos"
