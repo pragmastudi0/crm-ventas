@@ -2,32 +2,61 @@
 
 export function normalizeDate(dateString) {
   if (!dateString) return { value: null, error: "Fecha vacía" };
-  
-  const str = String(dateString).trim();
-  
-  // Intentar YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    const date = new Date(str);
+
+  let str = String(dateString).trim();
+
+  // Intentar convertir número de serie de Excel a fecha si se parece a uno.
+  // Los números de serie de Excel son generalmente enteros positivos.
+  const serialNum = parseFloat(str);
+  if (!isNaN(serialNum) && serialNum > 0 && serialNum < 60000 && String(serialNum) === str) {
+    // La fecha de origen de Excel es el 1 de enero de 1900 (serial 1).
+    // Sin embargo, Excel tiene un bug y considera 1900 como año bisiesto (añadiendo un 29 de febrero de 1900).
+    // Esto hace que todas las fechas a partir del 1 de marzo de 1900 estén un día desfasadas.
+    
+    // Empezamos con el 1 de enero de 1900 (que es el día 1 en Excel)
+    const excelEpoch = new Date('1900-01-01T00:00:00.000Z'); // Usar UTC para evitar problemas de zona horaria
+    let daysToAdd = serialNum - 1; // El serial 1 es el día 0 relativo a nuestro epoch
+
+    // Corregir el bug del año bisiesto de 1900 en Excel.
+    // Si el número de serie es 60 o más (es decir, 1 de marzo de 1900 o posterior),
+    // debemos restar un día para compensar el 29 de febrero de 1900 inexistente.
+    if (serialNum >= 60) {
+      daysToAdd--;
+    }
+
+    const date = new Date(excelEpoch.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+
+    if (!isNaN(date.getTime()) && date.getFullYear() >= 1900 && date.getFullYear() < 2100) {
+      return { value: date.toISOString().split('T')[0], error: null }; // Formato YYYY-MM-DD
+    } else {
+      return { value: dateString, error: "Número de serie de Excel inválido o fuera de rango razonable" };
+    }
+  }
+
+  // Intentar formato YYYY-MM-DD
+  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(str)) {
+    const date = new Date(str + 'T00:00:00'); // Añadir T00:00:00 para asegurar el parsing correcto
     if (!isNaN(date.getTime())) {
       return { value: str, error: null };
     }
   }
-  
-  // Intentar DD/MM/YYYY (Argentina)
-  const ddmmyyyyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+
+  // Intentar formato DD/MM/YYYY o DD-MM-YYYY (ej. Argentina)
+  const ddmmyyyyMatch = str.match(/^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4})$/);
   if (ddmmyyyyMatch) {
     const [, day, month, year] = ddmmyyyyMatch;
-    // Asumir DD/MM/YYYY para Argentina
-    const date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+    // Asumir DD/MM/YYYY. Añadir T00:00:00 para asegurar el parsing correcto.
+    const date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`);
     if (!isNaN(date.getTime())) {
-      return { 
+      return {
         value: `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`,
         error: null,
-        warning: parseInt(day) > 12 ? null : "Formato ambiguo (asumido DD/MM/YYYY)"
+        // Advertencia si el formato es ambiguo y podría interpretarse como MM/DD/YYYY
+        warning: (parseInt(day) > 12 && parseInt(month) <= 12) ? "Formato ambiguo (asumido DD/MM/YYYY)" : null
       };
     }
   }
-  
+
   return { value: str, error: "Formato de fecha inválido" };
 }
 
