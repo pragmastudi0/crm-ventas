@@ -41,7 +41,7 @@ export function normalizeDate(dateString) {
     }
   }
 
-  // Intentar formato DD/MM/YYYY o DD-MM-YYYY (ej. Argentina)
+  // Intentar formato DD/MM/YYYY o DD-MM/YYYY (ej. Argentina)
   const ddmmyyyyMatch = str.match(/^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{4})$/);
   if (ddmmyyyyMatch) {
     const [, day, month, year] = ddmmyyyyMatch;
@@ -221,6 +221,12 @@ export function normalizeRow(row, columnMapping) {
         if (dateResult.warning) warnings.push(dateResult.warning);
         break;
         
+      case 'codigo': // Nuevo caso para el campo codigo
+        const codigoResult = normalizeCodigo(value);
+        normalized.codigo = codigoResult.value;
+        if (codigoResult.error) errors.push(`Código: ${codigoResult.error}`);
+        break;
+        
       case 'costo':
       case 'comision':
       case 'venta':
@@ -282,4 +288,13 @@ export function normalizeRow(row, columnMapping) {
     _warnings: warnings,
     _hasErrors: errors.length > 0
   };
+}
+
+export function normalizeCodigo(codigoString) {
+  if (!codigoString || String(codigoString).trim() === "") {
+    return { value: null, error: "El código no puede estar vacío" };
+  }
+
+  const str = String(codigoString).trim().toUpperCase(); // Limpiar espacios y convertir a mayúsculas
+  return { value: str, error: null };
 }
