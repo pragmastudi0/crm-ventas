@@ -1,37 +1,35 @@
 import { base44 } from "@/api/base44Client";
 
-export async function generateNextVentaCode(year) {
-  // Buscar todas las ventas del año con formato V-YYYY-NNNNNN
-  const ventasDelAnio = await base44.entities.Venta.list(
-    "-codigo",
-    1000,
-    {}
-  );
-
-  // Filtrar solo las del año específico y con formato válido
-  const codigosValidos = ventasDelAnio
-    .map(v => v.codigo)
-    .filter(codigo => {
-      if (!codigo) return false;
-      const match = codigo.match(/^V-(\d{4})-(\d{6})$/);
-      return match && match[1] === String(year);
-    });
-
-  let maxSecuencia = 0;
+// Obtiene todas las ventas existentes y devuelve un mapa de año -> max secuencia
+export async function getMaxSecuenciasPorAnio() {
+  const todasLasVentas = await base44.entities.Venta.list("-codigo", 10000, {});
   
-  if (codigosValidos.length > 0) {
-    // Extraer el número secuencial más alto
-    codigosValidos.forEach(codigo => {
-      const match = codigo.match(/^V-\d{4}-(\d{6})$/);
-      if (match) {
-        const secuencia = parseInt(match[1], 10);
-        if (secuencia > maxSecuencia) {
-          maxSecuencia = secuencia;
-        }
+  const maxPorAnio = {};
+  
+  todasLasVentas.forEach(venta => {
+    if (!venta.codigo) return;
+    
+    const match = venta.codigo.match(/^V-(\d{4})-(\d{6})$/);
+    if (match) {
+      const year = match[1];
+      const secuencia = parseInt(match[2], 10);
+      
+      if (!maxPorAnio[year] || secuencia > maxPorAnio[year]) {
+        maxPorAnio[year] = secuencia;
       }
-    });
-  }
+    }
+  });
+  
+  return maxPorAnio;
+}
 
+// Genera el siguiente código para un año dado, usando el mapa de secuencias
+export function generateNextVentaCode(year, maxPorAnio) {
+  const maxSecuencia = maxPorAnio[String(year)] || 0;
   const siguienteSecuencia = maxSecuencia + 1;
+  
+  // Actualizar el mapa para la próxima llamada
+  maxPorAnio[String(year)] = siguienteSecuencia;
+  
   return `V-${year}-${String(siguienteSecuencia).padStart(6, '0')}`;
 }

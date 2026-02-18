@@ -14,7 +14,7 @@ import { normalizeRow } from "@/components/utils/importNormalization";
 import ImportPreviewTable from "@/components/ventas/ImportPreviewTable";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import { generateNextVentaCode } from "@/components/utils/ventaCodeGenerator";
+import { getMaxSecuenciasPorAnio, generateNextVentaCode } from "@/components/utils/ventaCodeGenerator";
 
 const PASOS = {
   UPLOAD: 1,
@@ -180,23 +180,24 @@ export default function ImportarVentas() {
         return;
       }
 
-      // Limpiar campos internos y generar códigos secuenciales
-      const datosLimpios = [];
+      // Obtener secuencias máximas una sola vez
+      const maxPorAnio = await getMaxSecuenciasPorAnio();
       
-      for (const row of datosValidos) {
+      // Limpiar campos internos y generar códigos secuenciales
+      const datosLimpios = datosValidos.map(row => {
         const { _errors, _warnings, _hasErrors, ...cleanData } = row;
         
         // Generar código automático basado en la fecha
         const fecha = cleanData.fecha || new Date().toISOString().split('T')[0];
         const year = new Date(fecha).getFullYear();
-        const codigoGenerado = await generateNextVentaCode(year);
+        const codigoGenerado = generateNextVentaCode(year, maxPorAnio);
         
-        datosLimpios.push({
+        return {
           ...cleanData,
           codigo: codigoGenerado,
           estado: "Finalizada"
-        });
-      }
+        };
+      });
 
       // Crear todas las ventas (ya no hay duplicados porque los códigos son nuevos)
       await base44.entities.Venta.bulkCreate(datosLimpios);
