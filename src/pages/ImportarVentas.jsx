@@ -14,6 +14,7 @@ import { normalizeRow } from "@/components/utils/importNormalization";
 import ImportPreviewTable from "@/components/ventas/ImportPreviewTable";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
+import { generateNextVentaCode } from "@/components/utils/ventaCodeGenerator";
 
 const PASOS = {
   UPLOAD: 1,
@@ -179,48 +180,28 @@ export default function ImportarVentas() {
         return;
       }
 
-      // Limpiar campos internos
-      const datosLimpios = datosValidos.map(row => {
+      // Limpiar campos internos y generar códigos secuenciales
+      const datosLimpios = [];
+      
+      for (const row of datosValidos) {
         const { _errors, _warnings, _hasErrors, ...cleanData } = row;
-        return {
+        
+        // Generar código automático basado en la fecha
+        const fecha = cleanData.fecha || new Date().toISOString().split('T')[0];
+        const year = new Date(fecha).getFullYear();
+        const codigoGenerado = await generateNextVentaCode(year);
+        
+        datosLimpios.push({
           ...cleanData,
+          codigo: codigoGenerado,
           estado: "Finalizada"
-        };
-      });
-
-      // Verificar duplicados si la estrategia es skip
-      if (duplicateStrategy === "skip") {
-        const codigosExistentes = await base44.entities.Venta.list();
-        const codigosSet = new Set(codigosExistentes.map(v => v.codigo));
-        
-        const sinDuplicados = datosLimpios.filter(row => !codigosSet.has(row.codigo));
-        
-        await base44.entities.Venta.bulkCreate(sinDuplicados);
-        
-        toast.success(`${sinDuplicados.length} ventas importadas correctamente`);
-      } else {
-        // Estrategia update: insertar una por una y actualizar si existe
-        let creadas = 0;
-        let actualizadas = 0;
-        
-        for (const venta of datosLimpios) {
-          if (venta.codigo) {
-            const existente = await base44.entities.Venta.filter({ codigo: venta.codigo });
-            if (existente.length > 0) {
-              await base44.entities.Venta.update(existente[0].id, venta);
-              actualizadas++;
-            } else {
-              await base44.entities.Venta.create(venta);
-              creadas++;
-            }
-          } else {
-            await base44.entities.Venta.create(venta);
-            creadas++;
-          }
-        }
-        
-        toast.success(`${creadas} ventas creadas, ${actualizadas} actualizadas`);
+        });
       }
+
+      // Crear todas las ventas (ya no hay duplicados porque los códigos son nuevos)
+      await base44.entities.Venta.bulkCreate(datosLimpios);
+      
+      toast.success(`${datosLimpios.length} ventas importadas correctamente`);
       
       setPaso(PASOS.CONFIRMACION);
     } catch (error) {
