@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Toaster } from "sonner";
+import { WorkspaceProvider } from "@/components/context/WorkspaceContext";
 
 const NAV_ITEMS = [
   { name: "Home", icon: LayoutDashboard, page: "Home" },
