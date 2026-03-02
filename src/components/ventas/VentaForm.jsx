@@ -255,6 +255,19 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
             </div>
           </div>
 
+          {/* WhatsApp del cliente - solo si no viene de consulta */}
+          {!consulta && (
+            <div className="space-y-2">
+              <Label>WhatsApp del cliente</Label>
+              <Input
+                value={formData.whatsappCliente}
+                onChange={(e) => setFormData({ ...formData, whatsappCliente: e.target.value })}
+                placeholder="Ej: 5491112345678 (con código de país)"
+              />
+              <p className="text-xs text-slate-500">Se creará el contacto automáticamente para usar el botón de WhatsApp en Postventa.</p>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label>Producto</Label>
             <Input
