@@ -34,7 +34,8 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
     venta: "",
     canje: 0,
     moneda: "USD",
-    notas: ""
+    notas: "",
+    whatsappCliente: ""
   });
 
   const [gananciaCalculada, setGananciaCalculada] = useState(null);
