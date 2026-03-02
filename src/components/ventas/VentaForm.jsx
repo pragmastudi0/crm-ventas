@@ -260,11 +260,19 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
               />
             </div>
             <div className="space-y-2">
-              <Label>Cliente *</Label>
+              <Label>Nombre *</Label>
               <Input 
                 value={formData.nombreSnapshot} 
                 onChange={(e) => setFormData({ ...formData, nombreSnapshot: e.target.value })}
-                placeholder="Nombre del cliente"
+                placeholder="Nombre (se usa en plantillas)"
+              />
+            </div>
+            <div className="space-y-2 col-span-2">
+              <Label>Apellido</Label>
+              <Input 
+                value={formData.apellidoSnapshot} 
+                onChange={(e) => setFormData({ ...formData, apellidoSnapshot: e.target.value })}
+                placeholder="Apellido del cliente"
               />
             </div>
           </div>
