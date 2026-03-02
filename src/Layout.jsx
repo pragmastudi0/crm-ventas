@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { 
   LayoutDashboard, Kanban, List, Users, MessageSquare, Calendar,
-  Menu, X, ChevronRight, CheckCircle2
+  Menu, X, ChevronRight, CheckCircle2, PanelLeftClose, PanelLeftOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
