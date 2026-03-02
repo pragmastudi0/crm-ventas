@@ -20,23 +20,16 @@ Deno.serve(async (req) => {
 
     const allVentas = await base44.asServiceRole.entities.Venta.list('-created_date', 500);
 
-    const updated = [];
-    for (const venta of allVentas) {
-      const snap = (venta.proveedorNombreSnapshot || '').trim();
-      const newName = nameMap[snap];
+    // Debug: show first 3 records raw
+    const sample = allVentas.slice(0, 3).map(v => ({
+      id: v.id,
+      snap: v.proveedorNombreSnapshot,
+      snapType: typeof v.proveedorNombreSnapshot,
+      snapEncoded: JSON.stringify(v.proveedorNombreSnapshot),
+      keys: Object.keys(v).slice(0, 15)
+    }));
 
-      if (newName && snap !== newName) {
-        await base44.asServiceRole.entities.Venta.update(venta.id, {
-          proveedorNombreSnapshot: newName
-        });
-        updated.push({ id: venta.id, codigo: venta.codigo, oldName: snap, newName });
-      }
-    }
-
-    return Response.json({
-      message: `Se actualizaron ${updated.length} ventas.`,
-      details: updated
-    });
+    return Response.json({ sample, total: allVentas.length });
 
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
