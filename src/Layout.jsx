@@ -56,17 +56,33 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed top-0 left-0 h-full w-64 bg-white border-r border-slate-100 z-50 transition-transform duration-300 lg:translate-x-0",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        "fixed top-0 left-0 h-full bg-white border-r border-slate-100 z-50 transition-all duration-300 flex flex-col",
+        sidebarCollapsed ? "lg:w-16" : "lg:w-64",
+        sidebarOpen ? "translate-x-0 w-64" : "-translate-x-full lg:translate-x-0"
       )}>
-        <div className="p-6">
-          <div className="flex items-center justify-between">
+        <div className={cn("p-4 flex items-center border-b border-slate-100", sidebarCollapsed ? "justify-center" : "justify-between")}>
+          {!sidebarCollapsed && (
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center flex-shrink-0">
                 <span className="text-white font-bold text-sm">A</span>
               </div>
               <span className="font-bold text-slate-900">AltatechCRM</span>
             </div>
+          )}
+          {sidebarCollapsed && (
+            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">A</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden lg:flex"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -78,7 +94,7 @@ export default function Layout({ children, currentPageName }) {
           </div>
         </div>
 
-        <nav className="px-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
           {NAV_ITEMS.map((item) => {
             const isActive = currentPageName === item.page;
             return (
@@ -86,32 +102,36 @@ export default function Layout({ children, currentPageName }) {
                 key={item.page}
                 to={createPageUrl(item.page)}
                 onClick={() => setSidebarOpen(false)}
+                title={sidebarCollapsed ? item.name : undefined}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
+                  sidebarCollapsed ? "justify-center" : "",
                   isActive 
                     ? "bg-slate-900 text-white" 
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 )}
               >
-                <item.icon className="w-5 h-5" />
-                {item.name}
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                {!sidebarCollapsed && item.name}
               </Link>
             );
           })}
         </nav>
 
         {/* Quick Stats */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-100">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-4 text-white">
-            <p className="text-xs text-slate-400 mb-1">Mini CRM</p>
-            <p className="text-sm font-medium">Seguimiento de ventas</p>
-            <p className="text-xs text-slate-400 mt-2">Altatech · Tecnología</p>
+        {!sidebarCollapsed && (
+          <div className="p-4 border-t border-slate-100">
+            <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-4 text-white">
+              <p className="text-xs text-slate-400 mb-1">Mini CRM</p>
+              <p className="text-sm font-medium">Seguimiento de ventas</p>
+              <p className="text-xs text-slate-400 mt-2">Altatech · Tecnología</p>
+            </div>
           </div>
-        </div>
+        )}
       </aside>
 
       {/* Main Content */}
-      <main className="lg:ml-64">
+      <main className={cn("transition-all duration-300", sidebarCollapsed ? "lg:ml-16" : "lg:ml-64")}>
         {children}
       </main>
     </div>
