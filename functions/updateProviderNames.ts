@@ -30,11 +30,11 @@ Deno.serve(async (req) => {
     const updatedProviders = [];
 
     for (const provider of allProviders) {
-      const normalizedProviderName = normalizeName(venta.proveedorNombreSnapshot);
+      const normalizedProviderName = normalizeName(proveedorNombreSnapshot);
       const newName = normalizedNameMap[normalizedProviderName];
-      if (newName && venta.proveedorNombreSnapshot !== newName) {
+      if (newName && proveedorNombreSnapshot !== newName) {
         await base44.asServiceRole.entities.Proveedor.update(provider.id, { nombre: newName });
-        updatedProviders.push({ id: provider.id, oldName: venta.proveedorNombreSnapshot, newName });
+        updatedProviders.push({ id: provider.id, oldName: proveedorNombreSnapshot, newName });
       }
     }
 
