@@ -120,7 +120,7 @@ export default function ConfigurarPipeline() {
       base44.entities.PipelineStage.update(etapaTarget.id, { orden: etapaActual.orden })
     ]);
 
-    queryClient.invalidateQueries({ queryKey: ['pipeline-stages'] });
+    queryClient.invalidateQueries({ queryKey: ['pipeline-stages', workspace?.id] });
     toast.success("Orden actualizado");
   };
 
