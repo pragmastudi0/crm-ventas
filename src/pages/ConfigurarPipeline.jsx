@@ -66,7 +66,7 @@ export default function ConfigurarPipeline() {
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.PipelineStage.update(id, { activa: false }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pipeline-stages'] });
+      queryClient.invalidateQueries({ queryKey: ['pipeline-stages', workspace?.id] });
       toast.success("Etapa eliminada");
     }
   });
