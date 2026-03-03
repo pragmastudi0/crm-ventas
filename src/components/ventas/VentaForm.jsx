@@ -216,7 +216,8 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
           canje,
           ganancia: gananciaCalculada,
           moneda: formData.moneda,
-          notas: formData.notas
+          notas: formData.notas,
+          workspace_id: workspace?.id
         };
 
         const ventaCreada = await base44.entities.Venta.create(ventaData);
