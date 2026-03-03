@@ -103,7 +103,8 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
     setLoading(true);
     const created = await base44.entities.Contacto.create({
       ...newContact,
-      numeroTelefono: newContact.whatsapp
+      numeroTelefono: newContact.whatsapp,
+      workspace_id: workspace?.id
     });
     
     setContactos([created, ...contactos]);
