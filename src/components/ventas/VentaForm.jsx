@@ -227,7 +227,8 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
           const contactoCreado = await base44.entities.Contacto.create({
             nombre: formData.nombreSnapshot,
             whatsapp: formData.whatsappCliente,
-            canalOrigen: formData.marketplace || "Otro"
+            canalOrigen: formData.marketplace || "Otro",
+            workspace_id: workspace?.id
           });
           await base44.entities.Venta.update(ventaCreada.id, { contactoId: contactoCreado.id });
         }
