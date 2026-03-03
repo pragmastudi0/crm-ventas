@@ -49,6 +49,8 @@ export default function Postventa() {
   const { data: currentUser } = useCurrentUser();
   const { workspace } = useWorkspace();
 
+  const postventaDays = currentUser?.postventa_follow_up_days ?? 7;
+
   const { data: ventas = [], isLoading } = useQuery({
     queryKey: ['ventas-postventa', workspace?.id],
     queryFn: () => workspace ? base44.entities.Venta.filter({ workspace_id: workspace.id, postventaActiva: true }, "-proximoSeguimientoPostventa", 1000) : [],
