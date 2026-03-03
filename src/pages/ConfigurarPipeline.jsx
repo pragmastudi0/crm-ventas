@@ -30,17 +30,20 @@ export default function ConfigurarPipeline() {
   const [formData, setFormData] = useState({ nombre: "", color: "bg-blue-500" });
 
   const queryClient = useQueryClient();
+  const { workspace } = useWorkspace();
 
   const { data: etapas = [] } = useQuery({
-    queryKey: ['pipeline-stages'],
+    queryKey: ['pipeline-stages', workspace?.id],
     queryFn: async () => {
-      const stages = await base44.entities.PipelineStage.list("orden", 100);
+      if (!workspace) return [];
+      const stages = await base44.entities.PipelineStage.filter({ workspace_id: workspace.id }, "orden", 100);
       return stages.filter(s => s.activa !== false);
-    }
+    },
+    enabled: !!workspace
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.PipelineStage.create(data),
+    mutationFn: (data) => base44.entities.PipelineStage.create({ ...data, workspace_id: workspace?.id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline-stages'] });
       toast.success("Etapa creada");
