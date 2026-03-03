@@ -45,12 +45,13 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
   const [modoGuardado, setModoGuardado] = useState("borrador"); // "borrador" o "finalizada"
 
   const { data: proveedores = [] } = useQuery({
-    queryKey: ['proveedores-activos'],
+    queryKey: ['proveedores-activos', workspace?.id],
     queryFn: async () => {
-      const all = await base44.entities.Proveedor.list();
+      if (!workspace) return [];
+      const all = await base44.entities.Proveedor.filter({ workspace_id: workspace.id });
       return all.filter(p => p.activo !== false);
     },
-    enabled: open
+    enabled: open && !!workspace
   });
 
   useEffect(() => {
