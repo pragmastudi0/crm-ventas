@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,18 +6,44 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Bell, User, Shield, Database, Trash2, Users, Loader2 } from "lucide-react";
+import { ArrowLeft, Bell, User, Shield, Database, Trash2, Users, Loader2, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/components/hooks/useCurrentUser";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Configuracion() {
   const { data: currentUser } = useCurrentUser();
+  const queryClient = useQueryClient();
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("user");
   const [isLoading, setIsLoading] = useState(false);
+  const [consultaDays, setConsultaDays] = useState(3);
+  const [postventaDays, setPostventaDays] = useState(7);
+  const [savingDays, setSavingDays] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      setConsultaDays(currentUser.consulta_follow_up_days ?? 3);
+      setPostventaDays(currentUser.postventa_follow_up_days ?? 7);
+    }
+  }, [currentUser]);
+
+  const handleSaveDays = async () => {
+    setSavingDays(true);
+    try {
+      await base44.auth.updateMe({
+        consulta_follow_up_days: Number(consultaDays),
+        postventa_follow_up_days: Number(postventaDays)
+      });
+      queryClient.invalidateQueries({ queryKey: ['current-user'] });
+      toast.success("Días hábiles guardados");
+    } finally {
+      setSavingDays(false);
+    }
+  };
 
   const handleInviteUser = async (e) => {
     e.preventDefault();
