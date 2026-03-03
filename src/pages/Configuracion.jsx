@@ -214,9 +214,53 @@ export default function Configuracion() {
             </div>
             <Separator />
             <div className="space-y-2">
-              <Label>Días para próximo seguimiento (por defecto)</Label>
-              <Input type="number" defaultValue="1" min="1" max="30" />
+              <Label>Moneda por defecto</Label>
+              <select className="w-full rounded-lg border border-slate-200 px-3 py-2">
+                <option value="USD">Dólares (USD)</option>
+                <option value="ARS">Pesos argentinos (ARS)</option>
+              </select>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Días hábiles */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Días hábiles de seguimiento
+            </CardTitle>
+            <CardDescription>Configura los días hábiles predeterminados para cada tipo de seguimiento automático</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Seguimiento de consultas (días hábiles)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="30"
+                  value={consultaDays}
+                  onChange={(e) => setConsultaDays(e.target.value)}
+                />
+                <p className="text-xs text-slate-400">Días que se agregan automáticamente al agendar un seguimiento de consulta</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Seguimiento de postventa (días hábiles)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={postventaDays}
+                  onChange={(e) => setPostventaDays(e.target.value)}
+                />
+                <p className="text-xs text-slate-400">Días que se agregan al completar el primer contacto de postventa</p>
+              </div>
+            </div>
+            <Button onClick={handleSaveDays} disabled={savingDays} className="gap-2">
+              {savingDays && <Loader2 className="w-4 h-4 animate-spin" />}
+              Guardar días hábiles
+            </Button>
           </CardContent>
         </Card>
 
