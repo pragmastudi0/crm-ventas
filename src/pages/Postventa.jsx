@@ -119,7 +119,7 @@ export default function Postventa() {
         postventaPaso: 1,
         proximoSeguimientoPostventa: addBusinessDays(new Date(), postventaDays)
       };
-      toast.success("Seguimiento marcado. Próximo contacto en 7 días hábiles.");
+      toast.success(`Seguimiento marcado. Próximo contacto en ${postventaDays} días hábiles.`);
     } else {
       updates = {
         postventaUltimoContacto: new Date().toISOString(),
