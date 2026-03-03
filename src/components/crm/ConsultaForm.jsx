@@ -59,8 +59,8 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
   });
 
   useEffect(() => {
-    loadContactos();
-  }, []);
+    if (workspace) loadContactos();
+  }, [workspace]);
 
   useEffect(() => {
     if (consulta) {
