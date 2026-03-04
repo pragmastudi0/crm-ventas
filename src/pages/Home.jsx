@@ -69,6 +69,40 @@ export default function Home() {
     moment(c.updated_date).isAfter(today.clone().subtract(30, 'days'))
   ).length;
 
+  // Dashboard avanzado KPIs
+  const last7Days = consultas.filter(c => moment(c.created_date).isAfter(today.clone().subtract(7, 'days')));
+  const last30Days = consultas.filter(c => moment(c.created_date).isAfter(today.clone().subtract(30, 'days')));
+  const concretados = consultas.filter(c => c.etapa === "Concretado");
+  const perdidos = consultas.filter(c => c.etapa === "Perdido");
+  const activos = consultas.filter(c => !["Concretado", "Perdido"].includes(c.etapa));
+  const tasaConversion = consultas.length > 0 ? ((concretados.length / consultas.length) * 100).toFixed(1) : 0;
+
+  const ventasMesActual = ventas.filter(v => v.fecha && moment(v.fecha).isSame(today, 'month') && v.estado === "Finalizada");
+  const gananciaMensual = ventasMesActual.reduce((acc, v) => acc + (v.ganancia || 0), 0);
+
+  const seguimientosHoy = consultas.filter(c =>
+    c.proximoSeguimiento &&
+    moment(c.proximoSeguimiento).isSameOrBefore(today, 'day') &&
+    !["Concretado", "Perdido"].includes(c.etapa)
+  );
+
+  const leadsPorCanal = CANALES.reduce((acc, canal) => {
+    acc[canal] = consultas.filter(c => c.canalOrigen === canal).length;
+    return acc;
+  }, {});
+  const canalData = Object.entries(leadsPorCanal).filter(([_, count]) => count > 0).map(([name, value]) => ({ name, value }));
+
+  const productosCounts = {};
+  consultas.forEach(c => {
+    const cat = c.categoriaProducto || "Otro";
+    productosCounts[cat] = (productosCounts[cat] || 0) + 1;
+  });
+  const productosData = Object.entries(productosCounts).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name, value]) => ({ name, value }));
+
+  const motivosCounts = {};
+  perdidos.forEach(c => { if (c.motivoPerdida) motivosCounts[c.motivoPerdida] = (motivosCounts[c.motivoPerdida] || 0) + 1; });
+  const motivosData = Object.entries(motivosCounts).map(([name, value]) => ({ name, value }));
+
   const handleWhatsApp = (consulta) => {
     setSelectedConsulta(consulta);
     setShowWhatsApp(true);
