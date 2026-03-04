@@ -12,10 +12,14 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { 
   Plus, TrendingUp, Clock, Handshake, CheckCircle2, 
-  Kanban, List, Users, MessageSquare, BarChart3, Settings,
-  Calendar, AlertCircle, ArrowRight, Zap
+  Kanban, List, Users, MessageSquare, BarChart3,
+  Calendar, AlertCircle, ArrowRight, Zap, XCircle, DollarSign, MessageCircle
 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import moment from "moment";
+
+const COLORS = ["#3b82f6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
+const CANALES = ["Instagram", "WhatsApp", "MercadoLibre", "Referido", "Local", "Otro"];
 
 export default function Home() {
   const [showForm, setShowForm] = useState(false);
