@@ -47,8 +47,10 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
 
   const mapEtapaToPlantilla = (etapa) => {
     if (etapa === "Nuevo") return "Nuevo";
-    if (["Seguimiento1", "Seguimiento2"].includes(etapa)) return "Seguimiento";
+    if (["Seguimiento1", "Seguimiento2", "Seguimiento"].includes(etapa)) return "Seguimiento";
     if (etapa === "Negociacion") return "Cierre";
+    if (etapa === "Concretado") return "Concretado";
+    if (etapa === "Perdido") return "Perdido";
     return "General";
   };
 
