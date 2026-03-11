@@ -79,9 +79,10 @@ export default function Hoy() {
 
   const handleMarcarCompletado = async (consulta) => {
     const nuevaFecha = moment().add(3, 'days').format("YYYY-MM-DD");
+    const campo = consulta.etapa === "Concretado" ? "fecha_seguimiento_posventa" : "proximoSeguimiento";
     await updateMutation.mutateAsync({
       id: consulta.id,
-      data: { proximoSeguimiento: nuevaFecha }
+      data: { [campo]: nuevaFecha }
     });
   };
 
