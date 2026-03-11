@@ -105,6 +105,7 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
     // 4. Registrar el envío
     try {
       await base44.entities.EnvioWhatsApp.create({
+        workspace_id: consulta.workspace_id,
         contactoId: consulta.contactoId,
         consultaId: consulta.id,
         contenidoEnviado: msg,
