@@ -85,16 +85,22 @@ export default function Hoy() {
     });
   };
 
-  const ConsultaItem = ({ consulta, tipo }) => (
-    <Card className="hover:shadow-md transition-all">
+  const ConsultaItem = ({ consulta, tipo }) => {
+    const esPosventa = consulta.etapa === "Concretado";
+    const fechaMostrar = esPosventa ? consulta.fecha_seguimiento_posventa : consulta.proximoSeguimiento;
+    return (
+    <Card className={`hover:shadow-md transition-all ${esPosventa ? "border-emerald-200 bg-emerald-50/30" : ""}`}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <h3 className="font-semibold text-slate-900">{consulta.contactoNombre}</h3>
-              <Badge className={etapaColors[consulta.etapa]}>
+              <Badge className={etapaColors[consulta.etapa] || "bg-slate-100 text-slate-700"}>
                 {consulta.etapa}
               </Badge>
+              {esPosventa && (
+                <Badge className="bg-emerald-600 text-white text-xs">Posventa</Badge>
+              )}
             </div>
             <p className="text-sm text-slate-600 mb-1">{consulta.productoConsultado}</p>
             {consulta.variante && (
@@ -110,7 +116,7 @@ export default function Hoy() {
               <span className={`text-xs ${
                 tipo === "vencido" ? "text-red-600 font-medium" : "text-slate-500"
               }`}>
-                {moment(consulta.proximoSeguimiento).format("DD/MM/YYYY")}
+                {moment(fechaMostrar).format("DD/MM/YYYY")}
                 {tipo === "vencido" && " (vencido)"}
               </span>
             </div>
