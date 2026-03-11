@@ -19,6 +19,7 @@ const etapaColors = {
   Seguimiento1: "bg-amber-100 text-amber-700",
   Seguimiento2: "bg-orange-100 text-orange-700",
   Negociacion: "bg-purple-100 text-purple-700",
+  Concretado: "bg-emerald-100 text-emerald-700",
 };
 
 export default function Hoy() {
