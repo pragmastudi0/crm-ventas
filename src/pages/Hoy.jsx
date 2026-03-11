@@ -43,24 +43,33 @@ export default function Hoy() {
 
   const today = moment();
 
-  const hoy = consultas.filter(c => 
-    c.proximoSeguimiento && 
-    moment(c.proximoSeguimiento).isSame(today, 'day') &&
-    !["Concretado", "Perdido"].includes(c.etapa)
-  );
+  // Helper: devuelve la fecha de seguimiento correcta según etapa
+  const getFechaSeguimiento = (c) =>
+    c.etapa === "Concretado" ? c.fecha_seguimiento_posventa : c.proximoSeguimiento;
 
-  const vencidos = consultas.filter(c => 
-    c.proximoSeguimiento && 
-    moment(c.proximoSeguimiento).isBefore(today, 'day') &&
-    !["Concretado", "Perdido"].includes(c.etapa)
-  );
+  const hoy = consultas.filter(c => {
+    const fecha = getFechaSeguimiento(c);
+    if (!fecha) return false;
+    if (c.etapa === "Perdido") return false;
+    return moment(fecha).isSame(today, 'day');
+  });
 
-  const proximos3d = consultas.filter(c => 
-    c.proximoSeguimiento && 
-    moment(c.proximoSeguimiento).isAfter(today, 'day') &&
-    moment(c.proximoSeguimiento).isBefore(today.clone().add(3, 'days'), 'day') &&
-    !["Concretado", "Perdido"].includes(c.etapa)
-  );
+  const vencidos = consultas.filter(c => {
+    const fecha = getFechaSeguimiento(c);
+    if (!fecha) return false;
+    if (c.etapa === "Perdido") return false;
+    return moment(fecha).isBefore(today, 'day');
+  });
+
+  const proximos3d = consultas.filter(c => {
+    const fecha = getFechaSeguimiento(c);
+    if (!fecha) return false;
+    if (c.etapa === "Perdido") return false;
+    return (
+      moment(fecha).isAfter(today, 'day') &&
+      moment(fecha).isBefore(today.clone().add(3, 'days'), 'day')
+    );
+  });
 
   const handleWhatsApp = (consulta) => {
     setSelectedConsulta(consulta);
