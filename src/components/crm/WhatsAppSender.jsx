@@ -120,6 +120,7 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
     
     // Crear registro de mensaje
     await base44.entities.Mensaje.create({
+      workspace_id: consulta.workspace_id,
       consultaId: consulta.id,
       plantillaId: selectedPlantilla?.id,
       contenidoFinal: mensaje,
