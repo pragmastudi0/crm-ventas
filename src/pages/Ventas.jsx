@@ -60,10 +60,7 @@ export default function Ventas() {
     return matchSearch && matchMarketplace && matchProveedor && matchEstado && matchFechaDesde && matchFechaHasta;
   });
 
-  const totalVentas = ventasFiltradas.reduce((acc, v) => acc + (v.venta || 0), 0);
-  const totalGanancia = ventasFiltradas.reduce((acc, v) => acc + (v.ganancia || 0), 0);
-  
-  // Ganancia del mes actual
+  // Ganancia del mes actual por moneda
   const hoy = new Date();
   const mesActual = hoy.getMonth();
   const añoActual = hoy.getFullYear();
@@ -72,7 +69,12 @@ export default function Ventas() {
     const fechaVenta = new Date(v.fecha);
     return fechaVenta.getMonth() === mesActual && fechaVenta.getFullYear() === añoActual;
   });
-  const gananciaMesActual = ventasMesActual.reduce((acc, v) => acc + (v.ganancia || 0), 0);
+  const gananciaMesUSD = ventasMesActual.filter(v => (v.moneda || 'USD') !== 'ARS').reduce((acc, v) => acc + (v.ganancia || 0), 0);
+  const gananciaMesARS = ventasMesActual.filter(v => v.moneda === 'ARS').reduce((acc, v) => acc + (v.ganancia || 0), 0);
+
+  // Ganancia total por moneda
+  const totalGananciaUSD = ventasFiltradas.filter(v => (v.moneda || 'USD') !== 'ARS').reduce((acc, v) => acc + (v.ganancia || 0), 0);
+  const totalGananciaARS = ventasFiltradas.filter(v => v.moneda === 'ARS').reduce((acc, v) => acc + (v.ganancia || 0), 0);
 
   return (
     <div className="min-h-screen bg-slate-50/50 p-6">
