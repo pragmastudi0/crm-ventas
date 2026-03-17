@@ -272,7 +272,7 @@ export default function Ventas() {
                             </Badge>
                           </TableCell>
                           <TableCell>{venta.fecha ? format(new Date(venta.fecha), 'dd/MM/yyyy') : '-'}</TableCell>
-                          <TableCell>{venta.nombreSnapshot}</TableCell>
+                          <TableCell>{venta.nombreSnapshot && venta.apellidoSnapshot}</TableCell>
                           <TableCell>
                             <div>
                               <p className="font-medium">{venta.productoSnapshot || venta.modelo}</p>
