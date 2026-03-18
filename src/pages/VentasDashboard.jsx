@@ -116,7 +116,7 @@ export default function VentasDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-slate-600">Total Ventas</p>
-                  <p className="text-2xl font-bold">US$ {totalVentas.toFixed(2)}</p>
+                  <p className="text-2xl font-bold">US$ {totalVentasUSD.toFixed(2)}</p>
                 </div>
               </div>
             </CardContent>
@@ -129,7 +129,8 @@ export default function VentasDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-slate-600">Ganancia Total</p>
-                  <p className="text-2xl font-bold text-green-600">US$ {totalGanancia.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-green-600">US$ {totalGananciaUSD.toFixed(2)}</p>
+                  {totalGananciaARS > 0 && <p className="text-sm font-semibold text-blue-600">$ {totalGananciaARS.toLocaleString('es-AR', {minimumFractionDigits: 0})} ARS</p>}
                 </div>
               </div>
             </CardContent>
@@ -141,8 +142,8 @@ export default function VentasDashboard() {
                   <ShoppingBag className="w-6 h-6 text-purple-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-600">Ganancia Promedio</p>
-                  <p className="text-2xl font-bold">US$ {gananciaPromedio.toFixed(2)}</p>
+                  <p className="text-sm text-slate-600">Ganancia Promedio (USD)</p>
+                  <p className="text-2xl font-bold">US$ {gananciaPromedioUSD.toFixed(2)}</p>
                 </div>
               </div>
             </CardContent>
@@ -186,7 +187,10 @@ export default function VentasDashboard() {
                       <Badge variant="secondary">{item.canal}</Badge>
                       <span className="text-sm text-slate-600">{item.cantidad} ventas</span>
                     </div>
-                    <span className="font-semibold">US$ {item.monto.toFixed(2)}</span>
+                    <span className="font-semibold">
+                       {item.montoUSD > 0 && <span className="text-green-700">US$ {item.montoUSD.toFixed(2)}</span>}
+                       {item.montoARS > 0 && <span className="text-blue-600 ml-1">$ {item.montoARS.toLocaleString('es-AR', {minimumFractionDigits: 0})}</span>}
+                     </span>
                   </div>
                 ))}
                 {dataCanales.length === 0 && (
@@ -231,7 +235,7 @@ export default function VentasDashboard() {
                 {dataProveedores.map(item => (
                   <div key={item.proveedor} className="flex items-center justify-between py-2 border-b border-slate-100">
                     <span className="font-medium">{item.proveedor}</span>
-                    <span className="text-green-600 font-semibold">US$ {item.ganancia.toFixed(2)}</span>
+                    <span className="text-green-600 font-semibold">US$ {item.ganancia.toFixed(2)} USD</span>
                   </div>
                 ))}
                 {dataProveedores.length === 0 && (
