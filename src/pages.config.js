@@ -77,7 +77,6 @@ export const PAGES = {
     "ConfigurarPipeline": ConfigurarPipeline,
     "Consultas": Consultas,
     "Contactos": Contactos,
-    "Dashboard": Dashboard,
     "EditorListaWhatsApp": EditorListaWhatsApp,
     "ExportarVentas": ExportarVentas,
     "Home": Home,
