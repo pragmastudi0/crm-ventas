@@ -17,15 +17,16 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     const { event, data, old_data, payload_too_large } = payload;
 
-    if (event?.type !== 'update') return Response.json({ ok: true, reason: 'not_update' });
+    if (!['create', 'update'].includes(event?.type)) return Response.json({ ok: true, reason: 'not_relevant_event' });
 
     if (payload_too_large) {
       return Response.json({ ok: true, reason: 'payload_too_large_skipped' });
     }
 
-    // Solo cuando cambia A Finalizada (no cuando ya estaba Finalizada)
+    // Solo ventas Finalizadas
     if (data?.estado !== 'Finalizada') return Response.json({ ok: true, reason: 'not_finalizada' });
-    if (old_data?.estado === 'Finalizada') return Response.json({ ok: true, reason: 'already_finalizada' });
+    // En updates, solo cuando recién cambia a Finalizada
+    if (event.type === 'update' && old_data?.estado === 'Finalizada') return Response.json({ ok: true, reason: 'already_finalizada' });
     // Si ya se activó postventa, no re-activar
     if (data?.postventaActiva === true) return Response.json({ ok: true, reason: 'postventa_already_active' });
 
