@@ -235,6 +235,9 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
         }
 
         toast.success(finalizar ? "Venta finalizada" : "Borrador guardado");
+        onVentaCreada?.(ventaCreada.id);
+        onOpenChange(false);
+        return;
       }
       
       onVentaCreada?.();
