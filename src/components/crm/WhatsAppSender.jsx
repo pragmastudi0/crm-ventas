@@ -43,7 +43,8 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
   }, [selectedPlantilla, consulta]);
 
   const loadPlantillas = async () => {
-    const data = await base44.entities.PlantillaWhatsApp.filter({ activa: true });
+    const user = await base44.auth.me();
+    const data = await base44.entities.PlantillaWhatsApp.filter({ activa: true, workspace_id: consulta?.workspace_id, created_by: user?.email });
     setPlantillas(data);
 
     const etapaMapeada = mapEtapaToPlantilla(consulta?.etapa);
