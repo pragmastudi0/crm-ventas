@@ -60,9 +60,9 @@ export default function Plantillas() {
   const { workspace } = useWorkspace();
 
   const { data: plantillas = [], refetch } = useQuery({
-    queryKey: ['plantillas', workspace?.id],
-    queryFn: () => workspace ? base44.entities.PlantillaWhatsApp.filter({ workspace_id: workspace.id }, "-created_date") : [],
-    enabled: !!workspace
+    queryKey: ['plantillas', workspace?.id, currentUser?.email],
+    queryFn: () => workspace && currentUser ? base44.entities.PlantillaWhatsApp.filter({ workspace_id: workspace.id, created_by: currentUser.email }, "-created_date") : [],
+    enabled: !!workspace && !!currentUser
   });
 
   const { data: variablesDB = [] } = useQuery({
