@@ -184,12 +184,10 @@ export default function Plantillas() {
               </Button>
             </Link>
           </div>
-          {currentUser?.role === 'admin' && (
-            <Button onClick={() => { resetForm(); setShowForm(true); }} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Nueva plantilla
-            </Button>
-          )}
+          <Button onClick={() => { resetForm(); setShowForm(true); }} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Nueva plantilla
+          </Button>
         </div>
 
         {/* Grid de plantillas */}
