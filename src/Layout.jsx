@@ -13,13 +13,13 @@ import { WorkspaceProvider } from "@/components/context/WorkspaceContext";
 const NAV_ITEMS = [
   { name: "Home", icon: LayoutDashboard, page: "Home" },
   { name: "Pipeline", icon: Kanban, page: "Pipeline" },
+  { name: "Hoy", icon: Calendar, page: "Hoy" },
   { name: "Consultas", icon: List, page: "Consultas" },
   { name: "Ventas", icon: LayoutDashboard, page: "Ventas" },
-  { name: "Proveedores", icon: Users, page: "Proveedores" },
-  { name: "Hoy", icon: Calendar, page: "Hoy" },
-  { name: "Contactos", icon: Users, page: "Contactos" },
-
   { name: "Postventa", icon: CheckCircle2, page: "Postventa" },
+  { name: "Proveedores", icon: Users, page: "Proveedores" },
+  { name: "Contactos", icon: Users, page: "Contactos" },
+  { name: "Inteligencia", icon: BarChart3, page: "InteligenciaNegocio" }
   { name: "Ajustes", icon: Users, page: "Ajustes" },
 ];
 
