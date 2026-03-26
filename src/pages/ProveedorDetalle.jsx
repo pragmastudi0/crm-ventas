@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Save, Trash2, MessageCircle, DollarSign, TrendingUp, Package, Mail, Phone, Globe, Instagram } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { useWorkspace } from "@/components/context/WorkspaceContext";
 
 const CATEGORIAS = ["iPhone", "Watch", "Mac", "iPad", "AirPods", "Accesorios", "General"];
 const MONEDAS = ["USD", "ARS", "USDT"];
@@ -26,6 +27,7 @@ export default function ProveedorDetalle() {
   const esNuevo = proveedorId === "nuevo";
 
   const queryClient = useQueryClient();
+  const { workspace } = useWorkspace();
 
   const [formData, setFormData] = useState({
     nombre: "",
@@ -70,16 +72,19 @@ export default function ProveedorDetalle() {
   const saveMutation = useMutation({
     mutationFn: (data) => {
       if (esNuevo) {
-        return base44.entities.Proveedor.create(data);
+        return base44.entities.Proveedor.create({ ...data, workspace_id: workspace?.id });
       }
       return base44.entities.Proveedor.update(proveedorId, data);
     },
     onSuccess: (data) => {
       toast.success(esNuevo ? "Proveedor creado" : "Proveedor actualizado");
       queryClient.invalidateQueries({ queryKey: ['proveedores'] });
-      if (esNuevo) {
+      if (esNuevo && data?.id) {
         window.location.href = createPageUrl(`ProveedorDetalle?id=${data.id}`);
       }
+    },
+    onError: (err) => {
+      toast.error("Error al guardar: " + (err?.message || "Intenta de nuevo"));
     }
   });
 
@@ -131,13 +136,13 @@ export default function ProveedorDetalle() {
     totalComprado: ventas.reduce((acc, v) => acc + (v.costo || 0), 0),
     totalVendido: ventas.reduce((acc, v) => acc + (v.venta || 0), 0),
     gananciaTotal: ventas.reduce((acc, v) => acc + (v.ganancia || 0), 0),
-    ultimaCompra: ventas.length > 0 
-      ? ventas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0].fecha 
+    ultimaCompra: ventas.length > 0
+      ? ventas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0].fecha
       : null
   };
 
-  const margenPromedio = metricas.totalVendido > 0 
-    ? (metricas.gananciaTotal / metricas.totalVendido * 100) 
+  const margenPromedio = metricas.totalVendido > 0
+    ? (metricas.gananciaTotal / metricas.totalVendido * 100)
     : 0;
 
   const formatWhatsAppNumber = (phone) => {
@@ -178,9 +183,9 @@ export default function ProveedorDetalle() {
                   </Button>
                 </a>
               )}
-              <Button onClick={handleSubmit} className="gap-2">
+              <Button onClick={handleSubmit} disabled={saveMutation.isPending} className="gap-2">
                 <Save className="w-4 h-4" />
-                Guardar
+                {saveMutation.isPending ? "Guardando..." : "Guardar"}
               </Button>
               {!esNuevo && (
                 <Button
