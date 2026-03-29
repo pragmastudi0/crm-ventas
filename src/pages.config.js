@@ -70,8 +70,7 @@ import Ventas from './pages/Ventas';
 import VentasDashboard from './pages/VentasDashboard';
 import __Layout from './Layout.jsx';
 import InteligenciaNegocio from './pages/InteligenciaNegocio';
-// dentro de PAGES:
-"InteligenciaNegocio": InteligenciaNegocio,
+
 
 
 export const PAGES = {
