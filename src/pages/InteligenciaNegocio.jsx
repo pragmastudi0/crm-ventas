@@ -190,7 +190,7 @@ Sé específico con los números. No uses frases genéricas. Máximo 350 palabra
           <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
             <Sparkles className="w-5 h-5 text-slate-400" />
           </div>
-          <p className="text-sm text-slate-400 max-w-xs mx-auto">Generá un análisis con IA basado en tus datos reales del CRM.</p>
+          <p className="text-sm text-slate-400 max-w-xs mx-auto">PROXIMAMENTE. Generá un análisis con IA basado en tus datos reales del CRM.</p>
         </div>
       )}
       {loading && !analysis && (
