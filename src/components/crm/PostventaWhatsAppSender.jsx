@@ -9,7 +9,7 @@ import { MessageCircle, Copy, ExternalLink, Check, Sparkles } from "lucide-react
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 
-export default function PostventaWhatsAppSender({ open, onOpenChange, venta, contactoWhatsapp, onMessageSent }) {
+export default function PostventaWhatsAppSender({ open, onOpenChange, venta, contactoWhatsapp, onMessageSent, workspaceId }) {
   const [plantillas, setPlantillas] = useState([]);
   const [variablesDB, setVariablesDB] = useState([]);
   const [selectedPlantilla, setSelectedPlantilla] = useState(null);
@@ -29,8 +29,12 @@ export default function PostventaWhatsAppSender({ open, onOpenChange, venta, con
 
   const loadData = async () => {
     const [allPlantillas, vars] = await Promise.all([
-      base44.entities.PlantillaWhatsApp.filter({ activa: true }),
-      base44.entities.VariablePlantilla.list()
+      workspaceId
+        ? base44.entities.PlantillaWhatsApp.filter({ activa: true, workspace_id: workspaceId })
+        : base44.entities.PlantillaWhatsApp.filter({ activa: true }),
+      workspaceId
+        ? base44.entities.VariablePlantilla.filter({ workspace_id: workspaceId })
+        : base44.entities.VariablePlantilla.list()
     ]);
     setVariablesDB(vars);
     const postventa = allPlantillas.filter(p => p.etapa === 'Postventa');

@@ -394,6 +394,7 @@ export default function Postventa() {
         onOpenChange={setShowWhatsApp}
         venta={selectedVenta}
         contactoWhatsapp={selectedVenta ? getWhatsApp(selectedVenta) : null}
+        workspaceId={workspace?.id}
         onMessageSent={() => queryClient.invalidateQueries({ queryKey: ['ventas-postventa', workspace?.id] })}
       />
 
