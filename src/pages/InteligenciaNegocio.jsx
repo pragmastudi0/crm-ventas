@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useWorkspace } from "@/components/context/WorkspaceContext";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { ArrowLeft, TrendingUp, Target, Zap, BarChart2, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowLeft, TrendingUp, Target, Zap, BarChart2, RefreshCw, Sparkles, MessageCircle } from "lucide-react";
 import moment from "moment";
 
 function pct(n, d) { return d > 0 ? ((n / d) * 100).toFixed(1) : "0.0"; }
@@ -59,7 +59,6 @@ function RankRow({ rank, name, value, sub, bar, barColor, badge }) {
   );
 }
 
-// Toggle row reutilizable
 function ManualToggleRow({ label, subAuto, subManual, active, onToggle, children }) {
   return (
     <div className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-3 border border-slate-100">
@@ -83,6 +82,229 @@ function ManualToggleRow({ label, subAuto, subManual, active, onToggle, children
     </div>
   );
 }
+
+// ─── Sección de Actividad ────────────────────────────────────────────────────
+
+function ActividadContacto({ workspace }) {
+  // Traemos envíos de WhatsApp (listas + sender)
+  const { data: envios = [] } = useQuery({
+    queryKey: ["ib-envios", workspace?.id],
+    queryFn: () => workspace
+      ? base44.entities.EnvioWhatsApp.filter({ workspace_id: workspace.id }, "-created_date", 2000)
+      : [],
+    enabled: !!workspace
+  });
+
+  // Traemos consultas para extraer ultimoContacto y recontactos
+  const { data: consultas = [] } = useQuery({
+    queryKey: ["ib-consultas-actividad", workspace?.id],
+    queryFn: () => workspace
+      ? base44.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 2000)
+      : [],
+    enabled: !!workspace
+  });
+
+  // Traemos ventas para postventaUltimoContacto
+  const { data: ventas = [] } = useQuery({
+    queryKey: ["ib-ventas-actividad", workspace?.id],
+    queryFn: () => workspace
+      ? base44.entities.Venta.filter({ workspace_id: workspace.id, estado: "Finalizada" }, "-fecha", 500)
+      : [],
+    enabled: !!workspace
+  });
+
+  // ── Construir lista unificada de contactos ──
+  // Cada "contacto" es un evento con fecha
+  const todosLosContactos = [];
+
+  // 1. EnvioWhatsApp (apertura o copia de lista/plantilla)
+  envios.forEach(e => {
+    if (e.created_date) {
+      todosLosContactos.push({
+        fecha: e.created_date,
+        tipo: "whatsapp",
+        nombre: e.contactoId || "—",
+        consultaId: e.consultaId || null,
+      });
+    }
+  });
+
+  // 2. ultimoContacto en consultas (cuando se marcó seguimiento o se envió desde WhatsApp sender)
+  consultas.forEach(c => {
+    if (c.ultimoContacto) {
+      todosLosContactos.push({
+        fecha: c.ultimoContacto,
+        tipo: "seguimiento",
+        nombre: c.contactoNombre || "—",
+        consultaId: c.id,
+      });
+    }
+  });
+
+  // 3. postventaUltimoContacto en ventas
+  ventas.forEach(v => {
+    if (v.postventaUltimoContacto) {
+      todosLosContactos.push({
+        fecha: v.postventaUltimoContacto,
+        tipo: "postventa",
+        nombre: v.nombreSnapshot || "—",
+        consultaId: null,
+      });
+    }
+  });
+
+  // Ordenar por fecha desc
+  todosLosContactos.sort((a, b) => moment(b.fecha).diff(moment(a.fecha)));
+
+  const hoy = moment().startOf("day");
+
+  // ── Mensajes de hoy ──
+  const contactosHoy = todosLosContactos.filter(c =>
+    moment(c.fecha).isSameOrAfter(hoy)
+  );
+
+  // ── Últimos 7 días agrupados por día ──
+  const ultimos7 = Array.from({ length: 7 }, (_, i) => {
+    const dia = moment().subtract(6 - i, "days").startOf("day");
+    const count = todosLosContactos.filter(c =>
+      moment(c.fecha).isSame(dia, "day")
+    ).length;
+    return { label: dia.format("ddd DD"), count, isHoy: i === 6 };
+  });
+  const promedio7 = (ultimos7.reduce((s, d) => s + d.count, 0) / 7).toFixed(1);
+  const maxDia = Math.max(...ultimos7.map(d => d.count), 1);
+
+  // ── Recontactos por consulta (consultas con más de 1 contacto) ──
+  const recontactosPorConsulta = {};
+  todosLosContactos.forEach(c => {
+    if (!c.consultaId) return;
+    recontactosPorConsulta[c.consultaId] = recontactosPorConsulta[c.consultaId] || {
+      nombre: c.nombre,
+      count: 0
+    };
+    recontactosPorConsulta[c.consultaId].count++;
+  });
+
+  const topRecontactos = Object.entries(recontactosPorConsulta)
+    .map(([id, d]) => ({ id, nombre: d.nombre, count: d.count }))
+    .filter(r => r.count > 1)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 7);
+
+  const maxRecontacto = topRecontactos[0]?.count || 1;
+
+  // ── Tipo de contacto breakdown ──
+  const porTipo = [
+    { label: "WhatsApp / Lista", count: todosLosContactos.filter(c => c.tipo === "whatsapp").length, color: "#25D366" },
+    { label: "Seguimiento marcado", count: todosLosContactos.filter(c => c.tipo === "seguimiento").length, color: "#6366f1" },
+    { label: "Postventa", count: todosLosContactos.filter(c => c.tipo === "postventa").length, color: "#f59e0b" },
+  ].filter(t => t.count > 0);
+  const totalTipos = porTipo.reduce((s, t) => s + t.count, 0) || 1;
+
+  return (
+    <Section title="Actividad de Contacto" icon={MessageCircle}
+      action={<span className="text-xs text-slate-400">Últimos 7 días</span>}
+    >
+      {/* KPIs de actividad */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 text-center">
+          <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Contactos hoy</p>
+          <p className="text-3xl font-black" style={{ color: contactosHoy.length > 0 ? "#6366f1" : "#94a3b8" }}>
+            {contactosHoy.length}
+          </p>
+        </div>
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 text-center">
+          <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Promedio / día</p>
+          <p className="text-3xl font-black text-slate-700">{promedio7}</p>
+          <p className="text-xs text-slate-400">últimos 7 días</p>
+        </div>
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 text-center col-span-2 sm:col-span-1">
+          <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total 7 días</p>
+          <p className="text-3xl font-black text-slate-700">{ultimos7.reduce((s, d) => s + d.count, 0)}</p>
+        </div>
+      </div>
+
+      {/* Barras por día */}
+      <div className="mb-5">
+        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Contactos por día</p>
+        <div className="flex items-end gap-2 h-24">
+          {ultimos7.map((d) => {
+            const h = maxDia > 0 ? Math.max((d.count / maxDia) * 80, d.count > 0 ? 6 : 0) : 0;
+            return (
+              <div key={d.label} className="flex-1 flex flex-col items-center gap-1">
+                {d.count > 0 && (
+                  <p className="text-xs text-slate-500">{d.count}</p>
+                )}
+                <div
+                  className="w-full rounded-t-md transition-all duration-700"
+                  style={{
+                    height: `${h}px`,
+                    minHeight: d.count > 0 ? 6 : 0,
+                    background: d.isHoy ? "#6366f1" : "#e2e8f0",
+                  }}
+                />
+                <p className={`text-xs font-medium leading-tight text-center ${d.isHoy ? "text-slate-900" : "text-slate-400"}`}
+                  style={{ fontSize: 10 }}>
+                  {d.label}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Breakdown por tipo */}
+      {porTipo.length > 0 && (
+        <div className="mb-5">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Por tipo</p>
+          <div className="space-y-2">
+            {porTipo.map(t => (
+              <div key={t.label} className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
+                <p className="text-sm text-slate-600 flex-1">{t.label}</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-24 h-1.5 bg-slate-100 rounded-full">
+                    <div
+                      className="h-1.5 rounded-full"
+                      style={{ width: `${(t.count / totalTipos) * 100}%`, background: t.color }}
+                    />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-700 w-6 text-right">{t.count}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Top recontactos */}
+      {topRecontactos.length > 0 ? (
+        <div>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
+            Clientes con más recontactos
+          </p>
+          {topRecontactos.map((r, i) => (
+            <RankRow
+              key={r.id}
+              rank={i + 1}
+              name={r.nombre}
+              value={`${r.count} contactos`}
+              bar={(r.count / maxRecontacto) * 100}
+              barColor={i === 0 ? "#6366f1" : "#94a3b8"}
+              badge={i === 0 ? "TOP" : null}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-slate-400 text-center py-3">
+          Aún no hay recontactos registrados. Los contactos aparecen acá cuando usás los botones de WhatsApp o marcás seguimientos.
+        </p>
+      )}
+    </Section>
+  );
+}
+
+// ─── AI Insights ─────────────────────────────────────────────────────────────
 
 function AIInsights({ aiData }) {
   const [analysis, setAnalysis] = useState("");
@@ -190,7 +412,7 @@ Sé específico con los números. No uses frases genéricas. Máximo 350 palabra
           <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
             <Sparkles className="w-5 h-5 text-slate-400" />
           </div>
-          <p className="text-sm text-slate-400 max-w-xs mx-auto">PROXIMAMENTE. Generá un análisis con IA basado en tus datos reales del CRM.</p>
+          <p className="text-sm text-slate-400 max-w-xs mx-auto">Generá un análisis con IA basado en tus datos reales del CRM.</p>
         </div>
       )}
       {loading && !analysis && (
@@ -208,10 +430,11 @@ Sé específico con los números. No uses frases genéricas. Máximo 350 palabra
   );
 }
 
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function InteligenciaNegocio() {
   const { workspace } = useWorkspace();
 
-  // ── estados calculadora ──
   const [objetivo, setObjetivo] = useState("");
   const [diasHabiles, setDiasHabiles] = useState(String(Math.round(daysLeftInMonth() * 0.7)));
   const [tdcManual, setTdcManual] = useState(false);
@@ -301,7 +524,6 @@ export default function InteligenciaNegocio() {
   const tendencia = meses[2].ganancia > 0 ? ((meses[3].ganancia - meses[2].ganancia) / meses[2].ganancia * 100).toFixed(1) : "0";
   const tendenciaPos = parseFloat(tendencia) >= 0;
 
-  // ── calculadora — valores efectivos ──
   const objNum = parseFloat(objetivo) || 0;
   const diasNum = parseFloat(diasHabiles) || 1;
   const tdcEfectiva = tdcManual ? (parseFloat(tdcManualVal) || 0) : tasaConversion;
@@ -316,7 +538,6 @@ export default function InteligenciaNegocio() {
   const aiData = { totalVentas, totalConsultas, totalGanancia, tasaConversion, ticketPromedio, gananciaProm, topProductos, topProveedores, canales };
   const barColors = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#06b6d4", "#8b5cf6"];
 
-  // input reutilizable con prefijo/sufijo
   function ManualInput({ value, onChange, prefix, suffix, placeholder }) {
     return (
       <div className="relative">
@@ -365,38 +586,33 @@ export default function InteligenciaNegocio() {
           <KPICard label="Ganancia / venta" value={usd(gananciaProm)} sub="últimos 30 días" color="#f59e0b" />
         </div>
 
+        {/* Actividad de Contacto — NUEVA SECCIÓN */}
+        <ActividadContacto workspace={workspace} />
+
         {/* Calculadora */}
         <Section title="Calculadora de Llamadas Diarias" icon={Target}
           action={<span className="text-xs text-slate-400">{daysLeftInMonth()} días restantes</span>}
         >
-          {/* Inputs principales */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
             <div>
               <label className="text-xs font-medium text-slate-500 uppercase tracking-wider block mb-1.5">Objetivo mensual (USD)</label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">US$</span>
-                <input
-                  type="number" value={objetivo} onChange={e => setObjetivo(e.target.value)} placeholder="0"
-                  className="w-full border border-slate-200 rounded-lg pl-10 pr-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white"
-                />
+                <input type="number" value={objetivo} onChange={e => setObjetivo(e.target.value)} placeholder="0"
+                  className="w-full border border-slate-200 rounded-lg pl-10 pr-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white" />
               </div>
             </div>
             <div>
               <label className="text-xs font-medium text-slate-500 uppercase tracking-wider block mb-1.5">Días hábiles restantes</label>
-              <input
-                type="number" value={diasHabiles} onChange={e => setDiasHabiles(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white"
-              />
+              <input type="number" value={diasHabiles} onChange={e => setDiasHabiles(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white" />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-500 uppercase tracking-wider block mb-1.5">Ya ganado este mes</label>
-              <div className="border border-emerald-200 rounded-lg px-3 py-2.5 text-sm font-semibold text-emerald-600 bg-emerald-50">
-                {usd(gananciaMes)}
-              </div>
+              <div className="border border-emerald-200 rounded-lg px-3 py-2.5 text-sm font-semibold text-emerald-600 bg-emerald-50">{usd(gananciaMes)}</div>
             </div>
           </div>
 
-          {/* Toggles manuales */}
           <div className="space-y-2 mb-4">
             <ManualToggleRow
               label="Ganancia promedio por venta manual"
@@ -405,9 +621,8 @@ export default function InteligenciaNegocio() {
               active={gpManual}
               onToggle={() => { setGpManual(!gpManual); setGpManualVal(""); }}
             >
-              <ManualInput value={gpManualVal} onChange={setGpManualVal} prefix="US$" placeholder=" 50" />
+              <ManualInput value={gpManualVal} onChange={setGpManualVal} prefix="US$" placeholder="ej: 80" />
             </ManualToggleRow>
-
             <ManualToggleRow
               label="Tasa de conversión manual"
               subAuto={tasaConversion > 0 ? `Usando dato del CRM: ${tasaConversion}% (${concretados30.length} de ${totalConsultas} consultas)` : "Sin datos en el CRM — activá para ingresar manualmente"}
@@ -419,7 +634,6 @@ export default function InteligenciaNegocio() {
             </ManualToggleRow>
           </div>
 
-          {/* Resultado */}
           {objNum > 0 && (
             <div className={`rounded-xl p-4 border ${yaAlcanzado ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"}`}>
               {yaAlcanzado ? (
@@ -430,12 +644,9 @@ export default function InteligenciaNegocio() {
               ) : !calculadoraLista ? (
                 <div className="text-center py-3">
                   <p className="text-sm text-slate-400">
-                    {gpEfectiva === 0 && tdcEfectiva === 0
-                      ? "Activá los valores manuales de ganancia promedio y tasa de conversión para calcular."
-                      : gpEfectiva === 0
-                      ? "Activá el valor manual de ganancia promedio por venta para calcular."
-                      : "Activá el valor manual de tasa de conversión para calcular."
-                    }
+                    {gpEfectiva === 0 && tdcEfectiva === 0 ? "Activá los valores manuales de ganancia promedio y tasa de conversión para calcular."
+                      : gpEfectiva === 0 ? "Activá el valor manual de ganancia promedio por venta para calcular."
+                      : "Activá el valor manual de tasa de conversión para calcular."}
                   </p>
                 </div>
               ) : (
@@ -463,11 +674,8 @@ export default function InteligenciaNegocio() {
               )}
             </div>
           )}
-
           {objNum === 0 && (
-            <p className="text-sm text-slate-400 text-center py-3">
-              Ingresá tu objetivo mensual para calcular cuántos contactos necesitás por día.
-            </p>
+            <p className="text-sm text-slate-400 text-center py-3">Ingresá tu objetivo mensual para calcular cuántos contactos necesitás por día.</p>
           )}
         </Section>
 
