@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MessageCircle, CheckCircle2, AlertCircle, Calendar, ArrowLeft, Phone, Pencil, Clock } from "lucide-react";
+import { MessageCircle, CheckCircle2, AlertCircle, Calendar, ArrowLeft, Phone, Pencil, Clock, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import moment from "moment";
@@ -31,19 +31,15 @@ function addBusinessDays(date, days) {
   return result.toISOString().split('T')[0];
 }
 
-const estadoColors = {
-  Pendiente: "bg-amber-100 text-amber-700",
-  Enviado: "bg-blue-100 text-blue-700",
-  Cerrado: "bg-emerald-100 text-emerald-700"
-};
-
 export default function Postventa() {
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [selectedVenta, setSelectedVenta] = useState(null);
   const [editingVenta, setEditingVenta] = useState(null);
   const [editDate, setEditDate] = useState("");
   const [filtroMarketplace, setFiltroMarketplace] = useState("todos");
-  const [filtroVendedor, setFiltroVendedor] = useState("todos");
+  const [showActivarDialog, setShowActivarDialog] = useState(false);
+  const [activarVentaId, setActivarVentaId] = useState(null);
+  const [activarFecha, setActivarFecha] = useState("");
 
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
@@ -51,11 +47,16 @@ export default function Postventa() {
 
   const postventaDays = currentUser?.postventa_follow_up_days ?? 7;
 
-  const { data: ventas = [], isLoading } = useQuery({
+  const { data: ventasFinalizadas = [], isLoading } = useQuery({
     queryKey: ['ventas-postventa', workspace?.id],
-    queryFn: () => workspace ? base44.entities.Venta.filter({ workspace_id: workspace.id, postventaActiva: true }, "-proximoSeguimientoPostventa", 1000) : [],
+    queryFn: () => workspace
+      ? base44.entities.Venta.filter({ workspace_id: workspace.id, estado: "Finalizada" }, "-fecha", 500)
+      : [],
     enabled: !!workspace
   });
+
+  const ventas = ventasFinalizadas.filter(v => v.postventaActiva === true);
+  const ventasSinPostventa = ventasFinalizadas.filter(v => !v.postventaActiva);
 
   const { data: contactos = [] } = useQuery({
     queryKey: ['contactos-postventa-map', workspace?.id],
@@ -75,60 +76,59 @@ export default function Postventa() {
 
   const today = moment();
 
+  const getWhatsApp = (venta) => {
+    if (venta.contactoId && contactosMap[venta.contactoId]?.whatsapp) {
+      return contactosMap[venta.contactoId].whatsapp;
+    }
+    const contactoPorNombre = contactos.find(c =>
+      c.nombre && venta.nombreSnapshot &&
+      venta.nombreSnapshot.toLowerCase().includes(c.nombre.toLowerCase())
+    );
+    return contactoPorNombre?.whatsapp || null;
+  };
+
+  const esCerrado = (v) => v.postventaEstado === "Cerrado";
+
   const ventasFiltradas = ventas.filter(v => {
     if (filtroMarketplace !== "todos" && v.marketplace !== filtroMarketplace) return false;
-    if (filtroVendedor !== "todos" && v.porUsuarioId !== filtroVendedor) return false;
     return true;
   });
 
   const vencidas = ventasFiltradas.filter(v =>
+    !esCerrado(v) &&
     v.proximoSeguimientoPostventa &&
-    moment(v.proximoSeguimientoPostventa).isBefore(today, 'day') &&
-    v.postventaEstado !== 'Cerrado'
+    moment(v.proximoSeguimientoPostventa).isBefore(today, 'day')
   );
 
   const deHoy = ventasFiltradas.filter(v =>
+    !esCerrado(v) &&
     v.proximoSeguimientoPostventa &&
-    moment(v.proximoSeguimientoPostventa).isSame(today, 'day') &&
-    v.postventaEstado !== 'Cerrado'
+    moment(v.proximoSeguimientoPostventa).isSame(today, 'day')
   );
 
   const proximas7d = ventasFiltradas.filter(v =>
+    !esCerrado(v) &&
     v.proximoSeguimientoPostventa &&
     moment(v.proximoSeguimientoPostventa).isAfter(today, 'day') &&
-    moment(v.proximoSeguimientoPostventa).isBefore(today.clone().add(7, 'days'), 'day') &&
-    v.postventaEstado !== 'Cerrado'
+    moment(v.proximoSeguimientoPostventa).isBefore(today.clone().add(7, 'days'), 'day')
   );
-
-  const vendedores = [...new Set(ventas.map(v => v.porUsuarioId).filter(Boolean))];
-
-  const getWhatsApp = (venta) => contactosMap[venta.contactoId]?.whatsapp || null;
 
   const handleWhatsApp = (venta) => {
     setSelectedVenta(venta);
     setShowWhatsApp(true);
   };
 
-  const handleMarcarEnviado = async (venta) => {
-    const paso = venta.postventaPaso || 0;
-    let updates;
-    if (paso === 0) {
-      updates = {
+  // UN SOLO PASO: marcar contacto realizado = cerrar postventa
+  const handleMarcarRealizado = async (venta) => {
+    await updateMutation.mutateAsync({
+      id: venta.id,
+      data: {
         postventaUltimoContacto: new Date().toISOString(),
-        postventaEstado: 'Enviado',
-        postventaPaso: 1,
-        proximoSeguimientoPostventa: addBusinessDays(new Date(), postventaDays)
-      };
-      toast.success(`Seguimiento marcado. Próximo contacto en ${postventaDays} días hábiles.`);
-    } else {
-      updates = {
-        postventaUltimoContacto: new Date().toISOString(),
-        postventaEstado: 'Cerrado',
-        postventaActiva: false
-      };
-      toast.success("Postventa cerrada.");
-    }
-    await updateMutation.mutateAsync({ id: venta.id, data: updates });
+        postventaEstado: "Cerrado",
+        postventaActiva: false,
+      }
+    });
+    toast.success("✅ Postventa completada. Proceso de venta finalizado.");
   };
 
   const handleEditarFecha = (venta) => {
@@ -142,6 +142,22 @@ export default function Postventa() {
     setEditingVenta(null);
   };
 
+  const handleActivarPostventa = async () => {
+    if (!activarVentaId || !activarFecha) return;
+    await updateMutation.mutateAsync({
+      id: activarVentaId,
+      data: {
+        postventaActiva: true,
+        postventaEstado: "Pendiente",
+        proximoSeguimientoPostventa: activarFecha,
+      }
+    });
+    toast.success("Postventa activada");
+    setShowActivarDialog(false);
+    setActivarVentaId(null);
+    setActivarFecha("");
+  };
+
   const defaultTab = vencidas.length > 0 ? "vencidas" : deHoy.length > 0 ? "hoy" : "proximas";
 
   const renderTable = (rows, emptyMsg) => (
@@ -153,82 +169,73 @@ export default function Postventa() {
             <TableHead className="font-semibold">Producto</TableHead>
             <TableHead className="font-semibold">Fecha Venta</TableHead>
             <TableHead className="font-semibold">Ganancia</TableHead>
-            <TableHead className="font-semibold">Próx. Seguimiento</TableHead>
-            <TableHead className="font-semibold">Estado</TableHead>
+            <TableHead className="font-semibold">Seguimiento</TableHead>
             <TableHead className="font-semibold text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.length > 0 ? rows.map(venta => {
             const whatsapp = getWhatsApp(venta);
-            const vencido = venta.proximoSeguimientoPostventa &&
-              moment(venta.proximoSeguimientoPostventa).isBefore(today, 'day') &&
-              venta.postventaEstado !== 'Cerrado';
+            const vencido = !esCerrado(venta) &&
+              venta.proximoSeguimientoPostventa &&
+              moment(venta.proximoSeguimientoPostventa).isBefore(today, 'day');
 
             return (
               <TableRow key={venta.id} className={cn(vencido ? "bg-red-50/40" : "")}>
                 <TableCell>
                   <p className="font-medium text-slate-900">{venta.nombreSnapshot}</p>
-                  {whatsapp && (
-                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                      <Phone className="w-3 h-3" />{whatsapp}
-                    </p>
-                  )}
+                  {whatsapp
+                    ? <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3" />{whatsapp}</p>
+                    : <p className="text-xs text-amber-500 mt-0.5">Sin WhatsApp</p>
+                  }
                 </TableCell>
                 <TableCell>
                   <p className="text-sm font-medium">{venta.productoSnapshot || venta.modelo || "-"}</p>
-                  <Badge variant="outline" className="text-xs mt-1">
-                    Paso {(venta.postventaPaso || 0) + 1}/2
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <p className="text-sm">{venta.fecha ? moment(venta.fecha).format("DD/MM/YY") : "-"}</p>
                   {venta.marketplace && <p className="text-xs text-slate-400">{venta.marketplace}</p>}
                 </TableCell>
                 <TableCell>
-                  {venta.ganancia != null ? (
-                    <p className={cn("font-semibold text-sm", venta.ganancia >= 0 ? "text-emerald-600" : "text-red-600")}>
-                      {venta.moneda} {venta.ganancia.toFixed(0)}
-                    </p>
-                  ) : <span className="text-slate-400">-</span>}
+                  <p className="text-sm">{venta.fecha ? moment(venta.fecha).format("DD/MM/YY") : "-"}</p>
+                </TableCell>
+                <TableCell>
+                  {venta.ganancia != null
+                    ? <p className={cn("font-semibold text-sm", venta.ganancia >= 0 ? "text-emerald-600" : "text-red-600")}>{venta.moneda} {venta.ganancia.toFixed(0)}</p>
+                    : <span className="text-slate-400">-</span>
+                  }
                 </TableCell>
                 <TableCell>
                   {venta.proximoSeguimientoPostventa ? (
                     <div className={cn("flex items-center gap-1 text-sm", vencido ? "text-red-600 font-medium" : "text-slate-600")}>
                       <Calendar className="w-3.5 h-3.5" />
                       {moment(venta.proximoSeguimientoPostventa).format("DD/MM/YY")}
-                      {vencido && <span className="text-xs">(vencido)</span>}
+                      {vencido && <span className="text-xs ml-1">(vencido)</span>}
                     </div>
                   ) : <span className="text-slate-400">-</span>}
-                </TableCell>
-                <TableCell>
-                  <Badge className={estadoColors[venta.postventaEstado] || ""}>
-                    {venta.postventaEstado}
-                  </Badge>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-1">
                     <Button
                       size="sm"
                       onClick={() => handleWhatsApp(venta)}
+                      disabled={!whatsapp}
                       className="bg-[#25D366] hover:bg-[#20bd5a] text-white h-8 w-8 p-0"
+                      title={!whatsapp ? "Sin WhatsApp" : "Enviar WhatsApp"}
                     >
                       <MessageCircle className="w-4 h-4" />
                     </Button>
                     <Button
                       size="sm"
-                      variant="outline"
-                      onClick={() => handleMarcarEnviado(venta)}
-                      className="h-8 px-2 text-xs"
+                      onClick={() => handleMarcarRealizado(venta)}
+                      className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                      {(venta.postventaPaso || 0) === 0 ? "P1 Enviado" : "Cerrar"}
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Realizado
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => handleEditarFecha(venta)}
                       className="h-8 w-8 p-0"
+                      title="Cambiar fecha"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
@@ -238,7 +245,7 @@ export default function Postventa() {
             );
           }) : (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-10 text-slate-400">{emptyMsg}</TableCell>
+              <TableCell colSpan={6} className="text-center py-10 text-slate-400">{emptyMsg}</TableCell>
             </TableRow>
           )}
         </TableBody>
@@ -257,7 +264,7 @@ export default function Postventa() {
             </Button>
           </Link>
           <h1 className="text-2xl font-bold text-slate-900">Postventa</h1>
-          <p className="text-slate-500">Seguimiento de clientes después de la venta</p>
+          <p className="text-slate-500">Un contacto por venta — marcarlo como realizado cierra el proceso.</p>
         </div>
 
         {/* Stats */}
@@ -282,8 +289,8 @@ export default function Postventa() {
           </Card>
         </div>
 
-        {/* Filtros */}
-        <div className="flex flex-wrap gap-3">
+        {/* Filtro */}
+        <div className="flex gap-3">
           <Select value={filtroMarketplace} onValueChange={setFiltroMarketplace}>
             <SelectTrigger className="w-44">
               <SelectValue placeholder="Marketplace" />
@@ -297,20 +304,8 @@ export default function Postventa() {
               <SelectItem value="Otro">Otro</SelectItem>
             </SelectContent>
           </Select>
-          {vendedores.length > 1 && (
-            <Select value={filtroVendedor} onValueChange={setFiltroVendedor}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Vendedor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos los vendedores</SelectItem>
-                {vendedores.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
         </div>
 
-        {/* Tabs */}
         <Tabs defaultValue={defaultTab}>
           <TabsList>
             <TabsTrigger value="vencidas" className="gap-1.5">
@@ -321,19 +316,20 @@ export default function Postventa() {
               <Clock className="w-3.5 h-3.5" />
               Hoy ({deHoy.length})
             </TabsTrigger>
-            <TabsTrigger value="proximas">
-              Próximos 7 días ({proximas7d.length})
-            </TabsTrigger>
-            <TabsTrigger value="todos">
-              Todos ({ventasFiltradas.length})
-            </TabsTrigger>
+            <TabsTrigger value="proximas">Próximos 7 días ({proximas7d.length})</TabsTrigger>
+            <TabsTrigger value="todos">Todos ({ventasFiltradas.length})</TabsTrigger>
+            {ventasSinPostventa.length > 0 && (
+              <TabsTrigger value="sin-postventa" className="text-amber-600">
+                Sin activar ({ventasSinPostventa.length})
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="vencidas" className="mt-4">
             {renderTable(vencidas, "¡No hay seguimientos vencidos!")}
           </TabsContent>
           <TabsContent value="hoy" className="mt-4">
-            {renderTable(deHoy, "No hay seguimientos programados para hoy.")}
+            {renderTable(deHoy, "No hay seguimientos para hoy.")}
           </TabsContent>
           <TabsContent value="proximas" className="mt-4">
             {renderTable(proximas7d, "No hay seguimientos en los próximos 7 días.")}
@@ -341,6 +337,55 @@ export default function Postventa() {
           <TabsContent value="todos" className="mt-4">
             {renderTable(ventasFiltradas, "No hay ventas con postventa activa.")}
           </TabsContent>
+
+          {ventasSinPostventa.length > 0 && (
+            <TabsContent value="sin-postventa" className="mt-4">
+              <Card>
+                <div className="p-4 border-b bg-amber-50">
+                  <p className="text-sm text-amber-700 font-medium">
+                    Ventas finalizadas sin postventa activada. Podés activarlas manualmente.
+                  </p>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50/50">
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Fecha Venta</TableHead>
+                      <TableHead>Ganancia</TableHead>
+                      <TableHead className="text-right">Acción</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {ventasSinPostventa.map(venta => (
+                      <TableRow key={venta.id}>
+                        <TableCell><p className="font-medium">{venta.nombreSnapshot}</p></TableCell>
+                        <TableCell><p className="text-sm">{venta.productoSnapshot || venta.modelo || "-"}</p></TableCell>
+                        <TableCell><p className="text-sm">{venta.fecha ? moment(venta.fecha).format("DD/MM/YY") : "-"}</p></TableCell>
+                        <TableCell>
+                          {venta.ganancia != null
+                            ? <p className="font-semibold text-sm text-emerald-600">{venta.moneda} {venta.ganancia.toFixed(0)}</p>
+                            : <span className="text-slate-400">-</span>
+                          }
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="outline" className="gap-1.5"
+                            onClick={() => {
+                              setActivarVentaId(venta.id);
+                              setActivarFecha(addBusinessDays(venta.fecha || new Date(), postventaDays));
+                              setShowActivarDialog(true);
+                            }}
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Activar Postventa
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
@@ -349,21 +394,34 @@ export default function Postventa() {
         onOpenChange={setShowWhatsApp}
         venta={selectedVenta}
         contactoWhatsapp={selectedVenta ? getWhatsApp(selectedVenta) : null}
-        onMessageSent={() => queryClient.invalidateQueries({ queryKey: ['ventas-postventa'] })}
+        onMessageSent={() => queryClient.invalidateQueries({ queryKey: ['ventas-postventa', workspace?.id] })}
       />
 
-      <Dialog open={!!editingVenta} onOpenChange={(open) => !open && setEditingVenta(null)}>
+      <Dialog open={!!editingVenta} onOpenChange={open => !open && setEditingVenta(null)}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Editar fecha de seguimiento</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Editar fecha de seguimiento</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <Label>Próximo seguimiento</Label>
-            <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+            <Input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingVenta(null)}>Cancelar</Button>
             <Button onClick={handleGuardarFecha}>Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showActivarDialog} onOpenChange={setShowActivarDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Activar Postventa</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label>Fecha del seguimiento</Label>
+            <Input type="date" value={activarFecha} onChange={e => setActivarFecha(e.target.value)} />
+            <p className="text-xs text-slate-500">Calculado en base a {postventaDays} días hábiles desde la venta.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowActivarDialog(false)}>Cancelar</Button>
+            <Button onClick={handleActivarPostventa}>Activar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
