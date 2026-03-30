@@ -59,6 +59,31 @@ function RankRow({ rank, name, value, sub, bar, barColor, badge }) {
   );
 }
 
+// Toggle row reutilizable
+function ManualToggleRow({ label, subAuto, subManual, active, onToggle, children }) {
+  return (
+    <div className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-3 border border-slate-100">
+      <div>
+        <p className="text-sm font-medium text-slate-700">{label}</p>
+        <p className="text-xs text-slate-400 mt-0.5">{active ? subManual : subAuto}</p>
+      </div>
+      <div className="flex items-center gap-3">
+        {active && children}
+        <button
+          onClick={onToggle}
+          className="relative w-11 h-6 rounded-full transition-colors duration-200 border-none cursor-pointer shrink-0"
+          style={{ background: active ? "#0f172a" : "#e2e8f0" }}
+        >
+          <span
+            className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+            style={{ transform: active ? "translateX(20px)" : "translateX(0)" }}
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AIInsights({ aiData }) {
   const [analysis, setAnalysis] = useState("");
   const [loading, setLoading] = useState(false);
@@ -152,7 +177,7 @@ Sé específico con los números. No uses frases genéricas. Máximo 350 palabra
     <Section title="Análisis IA del Negocio" icon={Sparkles}
       action={
         <button onClick={runAnalysis} disabled={loading}
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all border-none cursor-pointer"
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all border-none"
           style={{ background: loading ? "#e2e8f0" : "#0f172a", color: loading ? "#94a3b8" : "#fff", cursor: loading ? "not-allowed" : "pointer" }}
         >
           {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
@@ -191,6 +216,8 @@ export default function InteligenciaNegocio() {
   const [diasHabiles, setDiasHabiles] = useState(String(Math.round(daysLeftInMonth() * 0.7)));
   const [tdcManual, setTdcManual] = useState(false);
   const [tdcManualVal, setTdcManualVal] = useState("");
+  const [gpManual, setGpManual] = useState(false);
+  const [gpManualVal, setGpManualVal] = useState("");
 
   const { data: ventas = [] } = useQuery({
     queryKey: ["ib-ventas", workspace?.id],
@@ -274,19 +301,35 @@ export default function InteligenciaNegocio() {
   const tendencia = meses[2].ganancia > 0 ? ((meses[3].ganancia - meses[2].ganancia) / meses[2].ganancia * 100).toFixed(1) : "0";
   const tendenciaPos = parseFloat(tendencia) >= 0;
 
-  // ── calculadora ──
+  // ── calculadora — valores efectivos ──
   const objNum = parseFloat(objetivo) || 0;
   const diasNum = parseFloat(diasHabiles) || 1;
-  // TDC: usa manual si está activado, sino la del CRM
   const tdcEfectiva = tdcManual ? (parseFloat(tdcManualVal) || 0) : tasaConversion;
+  const gpEfectiva = gpManual ? (parseFloat(gpManualVal) || 0) : gananciaProm;
   const faltaGanar = Math.max(0, objNum - gananciaMes);
-  const ventasNecesarias = gananciaProm > 0 ? Math.ceil(faltaGanar / gananciaProm) : 0;
+  const ventasNecesarias = gpEfectiva > 0 ? Math.ceil(faltaGanar / gpEfectiva) : 0;
   const consultasNecesarias = tdcEfectiva > 0 ? Math.ceil(ventasNecesarias / (tdcEfectiva / 100)) : 0;
   const llamadasPorDia = diasNum > 0 ? Math.ceil(consultasNecesarias / diasNum) : 0;
   const yaAlcanzado = objNum > 0 && faltaGanar <= 0;
+  const calculadoraLista = gpEfectiva > 0 && tdcEfectiva > 0;
 
   const aiData = { totalVentas, totalConsultas, totalGanancia, tasaConversion, ticketPromedio, gananciaProm, topProductos, topProveedores, canales };
   const barColors = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#06b6d4", "#8b5cf6"];
+
+  // input reutilizable con prefijo/sufijo
+  function ManualInput({ value, onChange, prefix, suffix, placeholder }) {
+    return (
+      <div className="relative">
+        {prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{prefix}</span>}
+        <input
+          type="number" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder || "0"}
+          className="border border-slate-200 rounded-lg py-1.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white"
+          style={{ width: 110, paddingLeft: prefix ? 36 : 12, paddingRight: suffix ? 28 : 12 }}
+        />
+        {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{suffix}</span>}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -353,52 +396,47 @@ export default function InteligenciaNegocio() {
             </div>
           </div>
 
-          {/* Toggle TDC manual */}
-          <div className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-3 mb-4 border border-slate-100">
-            <div>
-              <p className="text-sm font-medium text-slate-700">Tasa de conversión manual</p>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {tdcManual
-                  ? `Usando TDC manual: ${tdcManualVal || "0"}%`
-                  : `Usando TDC del CRM: ${tasaConversion}% (${concretados30.length} de ${totalConsultas} consultas)`
-                }
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              {tdcManual && (
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={tdcManualVal}
-                    onChange={e => setTdcManualVal(e.target.value)}
-                    placeholder="ej: 15"
-                    min="0" max="100"
-                    className="w-24 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-right pr-7"
-                  />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
-                </div>
-              )}
-              {/* Toggle switch */}
-              <button
-                onClick={() => { setTdcManual(!tdcManual); setTdcManualVal(""); }}
-                className="relative w-11 h-6 rounded-full transition-colors duration-200 border-none cursor-pointer"
-                style={{ background: tdcManual ? "#0f172a" : "#e2e8f0" }}
-              >
-                <span
-                  className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
-                  style={{ transform: tdcManual ? "translateX(20px)" : "translateX(0)" }}
-                />
-              </button>
-            </div>
+          {/* Toggles manuales */}
+          <div className="space-y-2 mb-4">
+            <ManualToggleRow
+              label="Ganancia promedio por venta manual"
+              subAuto={gananciaProm > 0 ? `Usando dato del CRM: ${usd(gananciaProm)} / venta` : "Sin datos en el CRM — activá para ingresar manualmente"}
+              subManual={`Usando valor manual: ${gpManualVal ? usd(parseFloat(gpManualVal)) : "ingresá un monto"}`}
+              active={gpManual}
+              onToggle={() => { setGpManual(!gpManual); setGpManualVal(""); }}
+            >
+              <ManualInput value={gpManualVal} onChange={setGpManualVal} prefix="US$" placeholder="ej: 80" />
+            </ManualToggleRow>
+
+            <ManualToggleRow
+              label="Tasa de conversión manual"
+              subAuto={tasaConversion > 0 ? `Usando dato del CRM: ${tasaConversion}% (${concretados30.length} de ${totalConsultas} consultas)` : "Sin datos en el CRM — activá para ingresar manualmente"}
+              subManual={`Usando valor manual: ${tdcManualVal ? tdcManualVal + "%" : "ingresá un porcentaje"}`}
+              active={tdcManual}
+              onToggle={() => { setTdcManual(!tdcManual); setTdcManualVal(""); }}
+            >
+              <ManualInput value={tdcManualVal} onChange={setTdcManualVal} suffix="%" placeholder="ej: 15" />
+            </ManualToggleRow>
           </div>
 
-          {/* Resultado calculadora */}
+          {/* Resultado */}
           {objNum > 0 && (
             <div className={`rounded-xl p-4 border ${yaAlcanzado ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"}`}>
               {yaAlcanzado ? (
                 <div className="text-center py-2">
                   <p className="text-lg font-bold text-emerald-600">🎉 ¡Objetivo alcanzado!</p>
                   <p className="text-sm text-slate-500 mt-1">Ganaste {usd(gananciaMes)} de {usd(objNum)}</p>
+                </div>
+              ) : !calculadoraLista ? (
+                <div className="text-center py-3">
+                  <p className="text-sm text-slate-400">
+                    {gpEfectiva === 0 && tdcEfectiva === 0
+                      ? "Activá los valores manuales de ganancia promedio y tasa de conversión para calcular."
+                      : gpEfectiva === 0
+                      ? "Activá el valor manual de ganancia promedio por venta para calcular."
+                      : "Activá el valor manual de tasa de conversión para calcular."
+                    }
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -409,17 +447,16 @@ export default function InteligenciaNegocio() {
                   <div className="text-center">
                     <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Ventas necesarias</p>
                     <p className="text-xl font-bold text-slate-700">{ventasNecesarias}</p>
+                    <p className="text-xs text-slate-400">{usd(gpEfectiva)} c/u</p>
                   </div>
                   <div className="text-center">
                     <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Consultas</p>
-                    <p className="text-xl font-bold text-slate-700">{tdcEfectiva > 0 ? consultasNecesarias : "—"}</p>
-                    <p className="text-xs text-slate-400">
-                      {tdcEfectiva > 0 ? `conv. ${tdcEfectiva}%` : "Ingresá una TDC"}
-                    </p>
+                    <p className="text-xl font-bold text-slate-700">{consultasNecesarias}</p>
+                    <p className="text-xs text-slate-400">conv. {tdcEfectiva}%</p>
                   </div>
                   <div className="text-center bg-slate-900 rounded-lg py-2 px-3">
                     <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Por día</p>
-                    <p className="text-3xl font-black text-white">{tdcEfectiva > 0 ? llamadasPorDia : "—"}</p>
+                    <p className="text-3xl font-black text-white">{llamadasPorDia}</p>
                     <p className="text-xs text-slate-400">contactos</p>
                   </div>
                 </div>
