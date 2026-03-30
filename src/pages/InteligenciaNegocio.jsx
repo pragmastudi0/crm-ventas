@@ -405,7 +405,7 @@ export default function InteligenciaNegocio() {
               active={gpManual}
               onToggle={() => { setGpManual(!gpManual); setGpManualVal(""); }}
             >
-              <ManualInput value={gpManualVal} onChange={setGpManualVal} prefix="US$" placeholder="ej: 80" />
+              <ManualInput value={gpManualVal} onChange={setGpManualVal} prefix="US$" placeholder=" 50" />
             </ManualToggleRow>
 
             <ManualToggleRow
