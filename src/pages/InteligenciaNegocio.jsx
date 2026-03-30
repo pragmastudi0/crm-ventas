@@ -229,6 +229,8 @@ export default function InteligenciaNegocio() {
   const { workspace } = useWorkspace();
   const [objetivo, setObjetivo] = useState("");
   const [diasHabiles, setDiasHabiles] = useState(String(Math.round(daysLeftInMonth() * 0.7)));
+  const [tdcManual, setTdcManual] = useState(false);
+  const [tdcManualVal, setTdcManualVal] = useState("");
 
   const { data: ventas = [] } = useQuery({
     queryKey: ["ib-ventas", workspace?.id],
@@ -346,9 +348,10 @@ export default function InteligenciaNegocio() {
   // ── calculadora ──
   const objNum = parseFloat(objetivo) || 0;
   const diasNum = parseFloat(diasHabiles) || 1;
+  const tdcEfectiva = tdcManual ? (parseFloat(tdcManualVal) || 0) : tasaConversion;
   const faltaGanar = Math.max(0, objNum - gananciaMes);
   const ventasNecesarias = gananciaProm > 0 ? Math.ceil(faltaGanar / gananciaProm) : 0;
-  const consultasNecesarias = tasaConversion > 0 ? Math.ceil(ventasNecesarias / (tasaConversion / 100)) : 0;
+  const consultasNecesarias = tdcEfectiva > 0 ? Math.ceil(ventasNecesarias / (tdcEfectiva / 100)) : 0;
   const llamadasPorDia = diasNum > 0 ? Math.ceil(consultasNecesarias / diasNum) : 0;
   const yaAlcanzado = objNum > 0 && faltaGanar <= 0;
 
@@ -393,7 +396,7 @@ export default function InteligenciaNegocio() {
         <Section title="Calculadora de Llamadas Diarias" icon={Target}
           action={<span className="text-xs text-slate-400">{daysLeftInMonth()} días restantes</span>}
         >
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <div>
               <label className="text-xs font-medium text-slate-500 uppercase tracking-wider block mb-1.5">
                 Objetivo mensual (USD)
@@ -419,6 +422,43 @@ export default function InteligenciaNegocio() {
                 onChange={e => setDiasHabiles(e.target.value)}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white"
               />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Tasa de conversión
+                </label>
+                <button
+                  onClick={() => { setTdcManual(!tdcManual); setTdcManualVal(""); }}
+                  className="text-xs font-medium px-2 py-0.5 rounded-md border transition-all"
+                  style={{
+                    background: tdcManual ? "#0f172a" : "#f8fafc",
+                    color: tdcManual ? "#fff" : "#64748b",
+                    borderColor: tdcManual ? "#0f172a" : "#e2e8f0",
+                    cursor: "pointer"
+                  }}
+                >
+                  {tdcManual ? "Manual ✓" : "Manual"}
+                </button>
+              </div>
+              {tdcManual ? (
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={tdcManualVal}
+                    onChange={e => setTdcManualVal(e.target.value)}
+                    placeholder="ej: 15"
+                    min="0" max="100"
+                    className="w-full border-2 border-slate-900 rounded-lg px-3 pr-8 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none bg-white"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
+                </div>
+              ) : (
+                <div className="border border-indigo-200 rounded-lg px-3 py-2.5 text-sm font-semibold text-indigo-600 bg-indigo-50 flex items-center justify-between">
+                  <span>{tasaConversion}%</span>
+                  <span className="text-xs font-normal text-indigo-400">del CRM</span>
+                </div>
+              )}
             </div>
             <div>
               <label className="text-xs font-medium text-slate-500 uppercase tracking-wider block mb-1.5">
@@ -450,7 +490,7 @@ export default function InteligenciaNegocio() {
                   <div className="text-center">
                     <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Consultas</p>
                     <p className="text-xl font-bold text-slate-700">{consultasNecesarias}</p>
-                    <p className="text-xs text-slate-400">conv. {tasaConversion}%</p>
+                    <p className="text-xs text-slate-400">conv. {tdcEfectiva}%{tdcManual ? " (manual)" : ""}</p>
                   </div>
                   <div className="text-center bg-slate-900 rounded-lg py-2 px-3">
                     <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Por día</p>
