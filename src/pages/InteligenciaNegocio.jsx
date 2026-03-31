@@ -86,93 +86,17 @@ function ManualToggleRow({ label, subAuto, subManual, active, onToggle, children
 // ─── Sección de Actividad ────────────────────────────────────────────────────
 
 function ActividadContacto({ workspace }) {
-  // Traemos envíos de WhatsApp (listas + sender)
-  const { data: envios = [] } = useQuery({
-    queryKey: ["ib-envios", workspace?.id],
-    queryFn: () => workspace
-      ? base44.entities.EnvioWhatsApp.filter({ workspace_id: workspace.id }, "-created_date", 2000)
-      : [],
-    enabled: !!workspace
-  });
+  const [rango, setRango] = useState(7);
 
-  // Traemos consultas para extraer ultimoContacto y recontactos
-  const { data: consultas = [] } = useQuery({
-    queryKey: ["ib-consultas-actividad", workspace?.id],
-    queryFn: () => workspace
-      ? base44.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 2000)
-      : [],
-    enabled: !!workspace
-  });
-
-  // Traemos ventas para postventaUltimoContacto
-  const { data: ventas = [] } = useQuery({
-    queryKey: ["ib-ventas-actividad", workspace?.id],
-    queryFn: () => workspace
-      ? base44.entities.Venta.filter({ workspace_id: workspace.id, estado: "Finalizada" }, "-fecha", 500)
-      : [],
-    enabled: !!workspace
-  });
-
-  // ── Construir lista unificada de contactos ──
-  // Cada "contacto" es un evento con fecha
-  const todosLosContactos = [];
-
-  // 1. EnvioWhatsApp (apertura o copia de lista/plantilla)
-  envios.forEach(e => {
-    if (e.created_date) {
-      todosLosContactos.push({
-        fecha: e.created_date,
-        tipo: "whatsapp",
-        nombre: e.contactoId || "—",
-        consultaId: e.consultaId || null,
-      });
-    }
-  });
-
-  // 2. ultimoContacto en consultas (cuando se marcó seguimiento o se envió desde WhatsApp sender)
-  consultas.forEach(c => {
-    if (c.ultimoContacto) {
-      todosLosContactos.push({
-        fecha: c.ultimoContacto,
-        tipo: "seguimiento",
-        nombre: c.contactoNombre || "—",
-        consultaId: c.id,
-      });
-    }
-  });
-
-  // 3. postventaUltimoContacto en ventas
-  ventas.forEach(v => {
-    if (v.postventaUltimoContacto) {
-      todosLosContactos.push({
-        fecha: v.postventaUltimoContacto,
-        tipo: "postventa",
-        nombre: v.nombreSnapshot || "—",
-        consultaId: null,
-      });
-    }
-  });
-
-  // Ordenar por fecha desc
-  todosLosContactos.sort((a, b) => moment(b.fecha).diff(moment(a.fecha)));
-
-  const hoy = moment().startOf("day");
-
-  // ── Mensajes de hoy ──
-  const contactosHoy = todosLosContactos.filter(c =>
-    moment(c.fecha).isSameOrAfter(hoy)
-  );
-
-  // ── Últimos 7 días agrupados por día ──
-  const ultimos7 = Array.from({ length: 7 }, (_, i) => {
-    const dia = moment().subtract(6 - i, "days").startOf("day");
+  // ── Días agrupados por día según rango ──
+  const ultimos7 = Array.from({ length: rango }, (_, i) => {
+    const dia = moment().subtract(rango - 1 - i, "days").startOf("day");
     const count = todosLosContactos.filter(c =>
       moment(c.fecha).isSame(dia, "day")
     ).length;
-    return { label: dia.format("ddd DD"), count, isHoy: i === 6 };
+    return { label: dia.format(rango === 7 ? "ddd DD" : "DD/MM"), count, isHoy: i === rango - 1 };
   });
-  const promedio7 = (ultimos7.reduce((s, d) => s + d.count, 0) / 7).toFixed(1);
-  const maxDia = Math.max(...ultimos7.map(d => d.count), 1);
+  const promedio7 = (ultimos7.reduce((s, d) => s + d.count, 0) / rango).toFixed(1);
 
   // ── Recontactos por consulta (consultas con más de 1 contacto) ──
   const recontactosPorConsulta = {};
@@ -203,7 +127,20 @@ function ActividadContacto({ workspace }) {
 
   return (
     <Section title="Actividad de Contacto" icon={MessageCircle}
-      action={<span className="text-xs text-slate-400">Últimos 7 días</span>}
+      action={
+        <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+          <button
+            onClick={() => setRango(7)}
+            className="text-xs font-semibold px-2.5 py-1 rounded-md transition-all border-none cursor-pointer"
+            style={{ background: rango === 7 ? "#0f172a" : "transparent", color: rango === 7 ? "#fff" : "#64748b" }}
+          >7 días</button>
+          <button
+            onClick={() => setRango(30)}
+            className="text-xs font-semibold px-2.5 py-1 rounded-md transition-all border-none cursor-pointer"
+            style={{ background: rango === 30 ? "#0f172a" : "transparent", color: rango === 30 ? "#fff" : "#64748b" }}
+          >30 días</button>
+        </div>
+      }
     >
       {/* KPIs de actividad */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
@@ -216,10 +153,10 @@ function ActividadContacto({ workspace }) {
         <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 text-center">
           <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Promedio / día</p>
           <p className="text-3xl font-black text-slate-700">{promedio7}</p>
-          <p className="text-xs text-slate-400">últimos 7 días</p>
+          <p className="text-xs text-slate-400">últimos {rango} días</p>
         </div>
         <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 text-center col-span-2 sm:col-span-1">
-          <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total 7 días</p>
+          <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total {rango} días</p>
           <p className="text-3xl font-black text-slate-700">{ultimos7.reduce((s, d) => s + d.count, 0)}</p>
         </div>
       </div>
@@ -227,7 +164,7 @@ function ActividadContacto({ workspace }) {
       {/* Barras por día */}
       <div className="mb-5">
         <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Contactos por día</p>
-        <div className="flex items-end gap-2 h-24">
+        <div className={`flex items-end gap-1 h-24`}>
           {ultimos7.map((d) => {
             const h = maxDia > 0 ? Math.max((d.count / maxDia) * 80, d.count > 0 ? 6 : 0) : 0;
             return (
@@ -244,7 +181,7 @@ function ActividadContacto({ workspace }) {
                   }}
                 />
                 <p className={`text-xs font-medium leading-tight text-center ${d.isHoy ? "text-slate-900" : "text-slate-400"}`}
-                  style={{ fontSize: 10 }}>
+                  style={{ fontSize: rango === 30 ? 8 : 10 }}>
                   {d.label}
                 </p>
               </div>
