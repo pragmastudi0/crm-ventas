@@ -138,14 +138,15 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
       fechaEnvio: new Date().toISOString(),
     });
 
-    // FIX: addBusinessDays ahora devuelve un string "YYYY-MM-DD" directamente
-    const proximoSeguimiento = addBusinessDays(new Date(), 3);
-
     const updates = {
       ultimoContacto: new Date().toISOString(),
       cotizacionEnviada: true,
-      proximoSeguimiento, // ya es string, sin .split("T")[0] extra
     };
+
+    if (consulta.etapa !== "Concretado" && consulta.etapa !== "Perdido") {
+      // FIX: addBusinessDays ahora devuelve un string "YYYY-MM-DD" directamente
+      updates.proximoSeguimiento = addBusinessDays(new Date(), 3);
+    }
 
     if (consulta.etapa === "Nuevo") {
       updates.etapa = "Seguimiento";

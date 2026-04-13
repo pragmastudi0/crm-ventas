@@ -88,6 +88,7 @@ export default function PostventaWhatsAppSender({ open, onOpenChange, venta, con
       postventaUltimoContacto: new Date().toISOString(),
       postventaEstado: "Cerrado",
       postventaActiva: false,
+      proximoSeguimientoPostventa: null,
     });
     toast.success("✅ Postventa completada. Proceso de venta finalizado.");
     setLoading(false);

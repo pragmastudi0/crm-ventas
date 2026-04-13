@@ -80,12 +80,19 @@ export default function Hoy() {
   };
 
   const handleMarcarCompletado = async (consulta) => {
-    const nuevaFecha = moment().add(3, 'days').format("YYYY-MM-DD");
-    const campo = consulta.etapa === "Concretado" ? "fecha_seguimiento_posventa" : "proximoSeguimiento";
-    await updateMutation.mutateAsync({
-      id: consulta.id,
-      data: { [campo]: nuevaFecha }
-    });
+    if (consulta.etapa === "Concretado") {
+      // Finalizar posventa: limpiar fecha para que no vuelva a aparecer
+      await updateMutation.mutateAsync({
+        id: consulta.id,
+        data: { fecha_seguimiento_posventa: null }
+      });
+    } else {
+      const nuevaFecha = moment().add(3, 'days').format("YYYY-MM-DD");
+      await updateMutation.mutateAsync({
+        id: consulta.id,
+        data: { proximoSeguimiento: nuevaFecha }
+      });
+    }
   };
 
   const ConsultaItem = ({ consulta, tipo }) => {
