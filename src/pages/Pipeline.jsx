@@ -29,17 +29,17 @@ export default function Pipeline() {
   const { data: consultas = [], refetch } = useQuery({
     queryKey: ['consultas-pipeline', workspace?.id],
     queryFn: () => workspace ? crmClient.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 500) : [],
-    enabled: !!workspace
+    enabled: !!workspace?.id
   });
 
   const { data: etapas = [] } = useQuery({
     queryKey: ['pipeline-stages', workspace?.id],
     queryFn: () => (workspace ? fetchPipelineStages(workspace.id) : []),
-    enabled: !!workspace
+    enabled: !!workspace?.id
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => updateDeal(id, data),
+    mutationFn: ({ id, data }) => updateDeal(workspace?.id, id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultas-pipeline', workspace?.id] });
     }

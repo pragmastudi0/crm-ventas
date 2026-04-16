@@ -23,26 +23,27 @@ export async function fetchUsers() {
   );
 }
 
-export async function fetchDeals(userId) {
+export async function fetchDeals(workspaceId) {
   let query = supabase.from(TABLES.deals).select("*").order("created_at", { ascending: false });
-  if (userId) query = query.eq("user_id", userId);
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
   return requireNoError(query, "Failed to fetch deals");
 }
 
-export async function fetchPipelineStages(userId) {
+export async function fetchPipelineStages(workspaceId) {
   let query = supabase
     .from(TABLES.stages)
     .select("*")
     .eq("activa", true)
     .order("orden", { ascending: true });
 
-  if (userId) query = query.eq("user_id", userId);
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
 
   return requireNoError(query, "Failed to fetch pipeline stages");
 }
 
-export async function createDeal(userId, dealData) {
-  const payload = { ...dealData, user_id: userId };
+export async function createDeal(workspaceId, dealData) {
+  if (!workspaceId) throw new Error("workspace_id is required");
+  const payload = { ...dealData, workspace_id: workspaceId };
   const data = await requireNoError(
     supabase.from(TABLES.deals).insert(payload).select().single(),
     "Failed to create deal"
@@ -50,45 +51,75 @@ export async function createDeal(userId, dealData) {
   return data;
 }
 
-export async function updateDeal(dealId, dealData) {
+export async function updateDeal(workspaceId, dealId, dealData) {
+  if (!workspaceId) throw new Error("workspace_id is required");
   if (dealData.stage_id) {
     const stage = await requireNoError(
-      supabase.from(TABLES.stages).select("id").eq("id", dealData.stage_id).maybeSingle(),
+      supabase
+        .from(TABLES.stages)
+        .select("id")
+        .eq("id", dealData.stage_id)
+        .eq("workspace_id", workspaceId)
+        .maybeSingle(),
       "Invalid stage"
     );
     if (!stage) throw new Error("Invalid stage_id: stage does not exist");
   }
 
   return requireNoError(
-    supabase.from(TABLES.deals).update(dealData).eq("id", dealId).select().single(),
+    supabase
+      .from(TABLES.deals)
+      .update(dealData)
+      .eq("id", dealId)
+      .eq("workspace_id", workspaceId)
+      .select()
+      .single(),
     "Failed to update deal"
   );
 }
 
-export async function createPipelineStage(stageName, order, color, userId) {
-  const payload = { name: stageName, orden: order, color, activa: true, user_id: userId };
+export async function createPipelineStage(stageName, order, color, workspaceId) {
+  if (!workspaceId) throw new Error("workspace_id is required");
+  const payload = { name: stageName, orden: order, color, activa: true, workspace_id: workspaceId };
   return requireNoError(
     supabase.from(TABLES.stages).insert(payload).select().single(),
     "Failed to create pipeline stage"
   );
 }
 
-export async function updatePipelineStage(stageId, updates) {
+export async function updatePipelineStage(workspaceId, stageId, updates) {
+  if (!workspaceId) throw new Error("workspace_id is required");
   return requireNoError(
-    supabase.from(TABLES.stages).update(updates).eq("id", stageId).select().single(),
+    supabase
+      .from(TABLES.stages)
+      .update(updates)
+      .eq("id", stageId)
+      .eq("workspace_id", workspaceId)
+      .select()
+      .single(),
     "Failed to update pipeline stage"
   );
 }
 
-export async function deletePipelineStage(stageId) {
+export async function deletePipelineStage(workspaceId, stageId) {
+  if (!workspaceId) throw new Error("workspace_id is required");
   const stage = await requireNoError(
-    supabase.from(TABLES.stages).select("id,name").eq("id", stageId).maybeSingle(),
+    supabase
+      .from(TABLES.stages)
+      .select("id,name")
+      .eq("id", stageId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle(),
     "Failed to find stage"
   );
   if (!stage) throw new Error("Stage does not exist");
 
   const linkedDeals = await requireNoError(
-    supabase.from(TABLES.deals).select("id").eq("stage_id", stageId),
+    supabase
+      .from(TABLES.deals)
+      .select("id")
+      .eq("stage_id", stageId)
+      .eq("workspace_id", workspaceId),
     "Failed to validate stage usage"
   );
 
@@ -98,7 +129,11 @@ export async function deletePipelineStage(stageId) {
   }
 
   return requireNoError(
-    supabase.from(TABLES.stages).delete().eq("id", stageId),
+    supabase
+      .from(TABLES.stages)
+      .delete()
+      .eq("id", stageId)
+      .eq("workspace_id", workspaceId),
     "Failed to delete pipeline stage"
   );
 }

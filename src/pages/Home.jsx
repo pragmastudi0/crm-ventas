@@ -31,18 +31,18 @@ export default function Home() {
   const { data: consultas = [], refetch } = useQuery({
     queryKey: ['consultas-home', workspace?.id],
     queryFn: () => workspace ? crmClient.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 1000) : [],
-    enabled: !!workspace
+    enabled: !!workspace?.id
   });
 
   const { data: ventas = [] } = useQuery({
     queryKey: ['ventas-home', workspace?.id],
     queryFn: () => workspace ? crmClient.entities.Venta.filter({ workspace_id: workspace.id }, "-fecha", 500) : [],
-    enabled: !!workspace
+    enabled: !!workspace?.id
   });
   const { data: stages = [] } = useQuery({
     queryKey: ['pipeline-stages', workspace?.id],
     queryFn: () => (workspace ? fetchPipelineStages(workspace.id) : []),
-    enabled: !!workspace
+    enabled: !!workspace?.id
   });
 
   const today = moment();

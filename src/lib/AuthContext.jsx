@@ -45,6 +45,8 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(Boolean(sessionData?.session && currentUser));
       if (!sessionData?.session || !currentUser) {
         setAuthError({ type: "auth_required", message: "Authentication required" });
+      } else {
+        setAuthError(null);
       }
       setIsLoadingAuth(false);
     } catch (error) {

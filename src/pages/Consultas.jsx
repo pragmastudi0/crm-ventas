@@ -58,18 +58,18 @@ export default function Consultas() {
     queryFn: () => workspace
       ? crmClient.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 2000)
       : [],
-    enabled: !!workspace
+    enabled: !!workspace?.id
   });
 
   // Cargar etapas activas del pipeline dinámicamente
   const { data: etapasActivas = [] } = useQuery({
     queryKey: ['pipeline-stages', workspace?.id],
     queryFn: () => (workspace ? fetchPipelineStages(workspace.id) : []),
-    enabled: !!workspace
+    enabled: !!workspace?.id
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => updateDeal(id, data),
+    mutationFn: ({ id, data }) => updateDeal(workspace?.id, id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultas-list', workspace?.id] });
     }

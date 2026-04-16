@@ -32,3 +32,4 @@ node --loader ts-node/esm src/migration/migrateData.ts
 1. Backup Supabase before production migration.
 2. Run first in a staging environment.
 3. Compare source/export counts vs destination counts after import.
+4. Run `src/migration/backfillWorkspaceIdentity.sql` to normalize `workspace_id` and UUID `user_id`.

@@ -35,7 +35,7 @@ export default function ConfigurarPipeline() {
   const { data: etapas = [] } = useQuery({
     queryKey: ['pipeline-stages', workspace?.id],
     queryFn: () => (workspace ? fetchPipelineStages(workspace.id) : []),
-    enabled: !!workspace
+    enabled: !!workspace?.id
   });
 
   const createMutation = useMutation({
@@ -49,7 +49,7 @@ export default function ConfigurarPipeline() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => updatePipelineStage(id, data),
+    mutationFn: ({ id, data }) => updatePipelineStage(workspace?.id, id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline-stages', workspace?.id] });
       toast.success("Etapa actualizada");
@@ -60,7 +60,7 @@ export default function ConfigurarPipeline() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => deletePipelineStage(id),
+    mutationFn: (id) => deletePipelineStage(workspace?.id, id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline-stages', workspace?.id] });
       toast.success("Etapa eliminada");
@@ -115,8 +115,8 @@ export default function ConfigurarPipeline() {
     const etapaTarget = etapas[targetIndex];
 
     await Promise.all([
-      updatePipelineStage(etapaActual.id, { orden: etapaTarget.orden }),
-      updatePipelineStage(etapaTarget.id, { orden: etapaActual.orden })
+      updatePipelineStage(workspace?.id, etapaActual.id, { orden: etapaTarget.orden }),
+      updatePipelineStage(workspace?.id, etapaTarget.id, { orden: etapaActual.orden })
     ]);
 
     queryClient.invalidateQueries({ queryKey: ['pipeline-stages', workspace?.id] });
