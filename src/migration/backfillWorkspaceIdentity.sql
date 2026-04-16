@@ -2,6 +2,10 @@
 -- Assumes:
 -- - workspace scope is workspace_id
 -- - identity key is auth.users.id (UUID)
+--
+-- Si owner_user_id / user_id están NULL o con UUID inválido (CSV viejo), ejecutá primero:
+--   link_workspace_members_to_auth_users.sql
+-- y después este script, o re-importá workspaces/members con migrate-csv.mjs (inyecta emails).
 
 begin;
 

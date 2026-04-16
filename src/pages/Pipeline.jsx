@@ -88,11 +88,11 @@ export default function Pipeline() {
   };
 
   const handleVentaCreada = async (ventaId) => {
-    if (selectedConsulta) {
-      await crmClient.entities.Consulta.update(selectedConsulta.id, {
+    if (selectedConsulta && workspace?.id) {
+      await updateDeal(workspace.id, selectedConsulta.id, {
         etapa: "Concretado",
         concretado: true,
-        stage_id: null
+        stage_id: null,
       });
       queryClient.invalidateQueries({ queryKey: ['consultas-pipeline'] });
       toast.success("Venta registrada y consulta marcada como Concretado");

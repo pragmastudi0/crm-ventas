@@ -4,6 +4,7 @@ import { MessageCircle, Calendar, MoreHorizontal, CheckCircle, XCircle } from "l
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import moment from "moment";
+import { isConsultaSeguimientoInactive } from "@/api/crmApi";
 
 const prioridadColors = {
   Alta: "bg-red-50 text-red-700 border-red-200",
@@ -21,10 +22,17 @@ const MOTIVOS_PERDIDA = [
 ];
 
 export default function ConsultaCard({ consulta, onWhatsApp, onEdit, onConcretarVenta, onMarcarPerdido, isDragging }) {
-  const seguimientoVencido = consulta.proximoSeguimiento &&
-    moment(consulta.proximoSeguimiento).isBefore(moment(), 'day');
-  const seguimientoHoy = consulta.proximoSeguimiento &&
-    moment(consulta.proximoSeguimiento).isSame(moment(), 'day');
+  const seguimientoOculto = isConsultaSeguimientoInactive(consulta);
+  const seguimientoVencido =
+    !seguimientoOculto &&
+    consulta.proximoSeguimiento &&
+    moment(consulta.proximoSeguimiento).isValid() &&
+    moment(consulta.proximoSeguimiento).isBefore(moment(), "day");
+  const seguimientoHoy =
+    !seguimientoOculto &&
+    consulta.proximoSeguimiento &&
+    moment(consulta.proximoSeguimiento).isValid() &&
+    moment(consulta.proximoSeguimiento).isSame(moment(), "day");
 
   return (
     <div className={cn(
@@ -71,8 +79,8 @@ export default function ConsultaCard({ consulta, onWhatsApp, onEdit, onConcretar
         )}
       </div>
 
-      {/* Seguimiento */}
-      {consulta.proximoSeguimiento && (
+      {/* Seguimiento (solo consultas abiertas) */}
+      {!seguimientoOculto && consulta.proximoSeguimiento && moment(consulta.proximoSeguimiento).isValid() && (
         <div className={cn(
           "flex items-center gap-1.5 text-xs mb-3 px-2 py-1 rounded-lg w-fit",
           seguimientoVencido ? "bg-red-50 text-red-600" :

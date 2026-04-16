@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Copy, ExternalLink, Check, Sparkles } from "lucide-react";
 import { crmClient } from "@/api/crmClient";
+import { updateDeal, applyClosedConsultaFollowupFields } from "@/api/crmApi";
 import { toast } from "sonner";
 
 // FIX: reemplazamos el import de date-fns por una implementación local
@@ -154,7 +155,22 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
       updates.etapa = "Seguimiento";
     }
 
-    await crmClient.entities.Consulta.update(consulta.id, updates);
+    if (consulta.workspace_id) {
+      await updateDeal(consulta.workspace_id, consulta.id, {
+        ...updates,
+        etapa: updates.etapa ?? consulta.etapa,
+        concretado: updates.concretado ?? consulta.concretado,
+      });
+    } else {
+      await crmClient.entities.Consulta.update(
+        consulta.id,
+        applyClosedConsultaFollowupFields({
+          ...updates,
+          etapa: updates.etapa ?? consulta.etapa,
+          concretado: updates.concretado ?? consulta.concretado,
+        }),
+      );
+    }
 
     toast.success("Mensaje registrado correctamente");
     setLoading(false);

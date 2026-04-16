@@ -17,7 +17,7 @@ const ENTITY_TABLES = {
 };
 
 const normalizeSort = (sort) => {
-  if (!sort) return { column: "created_at", ascending: false };
+  if (!sort) return { column: "created_date", ascending: false };
   if (sort.startsWith("-")) return { column: sort.slice(1), ascending: false };
   return { column: sort, ascending: true };
 };
@@ -43,6 +43,28 @@ const createEntityApi = (entityName) => {
       const { data, error } = await query.order(column, { ascending });
       if (error) throw error;
       return data || [];
+    },
+    /**
+     * Recorre todas las páginas (PostgREST suele limitar ~1000 filas por request).
+     */
+    async filterFetchAll(filter = {}, sort = "-created_at", chunkSize = 1000) {
+      const { column, ascending } = normalizeSort(sort);
+      const all = [];
+      let from = 0;
+      for (;;) {
+        let query = supabase
+          .from(tableName)
+          .select("*")
+          .range(from, from + chunkSize - 1);
+        query = applyFilters(query, filter);
+        const { data, error } = await query.order(column, { ascending });
+        if (error) throw error;
+        const rows = data || [];
+        all.push(...rows);
+        if (rows.length < chunkSize) break;
+        from += chunkSize;
+      }
+      return all;
     },
     async list(sort = "-created_at", limit = 1000) {
       const { column, ascending } = normalizeSort(sort);

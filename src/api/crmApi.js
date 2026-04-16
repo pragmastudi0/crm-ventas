@@ -10,6 +10,42 @@ function toAppError(error, fallbackMessage) {
   return new Error(error?.message || fallbackMessage || "Unexpected Supabase error");
 }
 
+/** Etapa de pipeline “ganada” (incluye nombres típicos fuera de Concretado). */
+function etapaIndicatesClosedWon(etapa) {
+  if (!etapa || typeof etapa !== "string") return false;
+  if (etapa === "Concretado") return true;
+  return /concretad|ganad|won|closed/i.test(etapa);
+}
+
+function etapaIndicatesLost(etapa) {
+  if (!etapa || typeof etapa !== "string") return false;
+  if (etapa === "Perdido") return true;
+  return /perdid|lost/i.test(etapa);
+}
+
+/**
+ * Consulta cerrada: no debe llevar fechas de seguimiento (eso es solo Venta/postventa).
+ */
+export function applyClosedConsultaFollowupFields(dealData) {
+  const won = dealData.concretado === true || etapaIndicatesClosedWon(dealData.etapa);
+  const lost = etapaIndicatesLost(dealData.etapa);
+  if (!won && !lost) return dealData;
+  return {
+    ...dealData,
+    proximoSeguimiento: null,
+    fecha_seguimiento_posventa: null,
+  };
+}
+
+/** Para ocultar UI de seguimiento en cards/listas. */
+export function isConsultaSeguimientoInactive(consulta) {
+  if (!consulta) return false;
+  if (consulta.concretado === true) return true;
+  return (
+    etapaIndicatesClosedWon(consulta.etapa) || etapaIndicatesLost(consulta.etapa)
+  );
+}
+
 async function requireNoError(promise, fallbackMessage) {
   const { data, error } = await promise;
   if (error) throw toAppError(error, fallbackMessage);
@@ -43,7 +79,10 @@ export async function fetchPipelineStages(workspaceId) {
 
 export async function createDeal(workspaceId, dealData) {
   if (!workspaceId) throw new Error("workspace_id is required");
-  const payload = { ...dealData, workspace_id: workspaceId };
+  const payload = applyClosedConsultaFollowupFields({
+    ...dealData,
+    workspace_id: workspaceId,
+  });
   const data = await requireNoError(
     supabase.from(TABLES.deals).insert(payload).select().single(),
     "Failed to create deal"
@@ -53,12 +92,13 @@ export async function createDeal(workspaceId, dealData) {
 
 export async function updateDeal(workspaceId, dealId, dealData) {
   if (!workspaceId) throw new Error("workspace_id is required");
-  if (dealData.stage_id) {
+  const normalized = applyClosedConsultaFollowupFields({ ...dealData });
+  if (normalized.stage_id) {
     const stage = await requireNoError(
       supabase
         .from(TABLES.stages)
         .select("id")
-        .eq("id", dealData.stage_id)
+        .eq("id", normalized.stage_id)
         .eq("workspace_id", workspaceId)
         .maybeSingle(),
       "Invalid stage"
@@ -69,7 +109,7 @@ export async function updateDeal(workspaceId, dealId, dealData) {
   return requireNoError(
     supabase
       .from(TABLES.deals)
-      .update(dealData)
+      .update(normalized)
       .eq("id", dealId)
       .eq("workspace_id", workspaceId)
       .select()

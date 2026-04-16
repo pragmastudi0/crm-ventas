@@ -13,7 +13,12 @@ import { toast } from "sonner";
 import { User, Package, DollarSign, Calendar, Plus } from "lucide-react";
 import moment from "moment";
 import { getNextBusinessDay } from "@/components/utils/dateUtils";
-import { fetchPipelineStages, createDeal, updateDeal } from "@/api/crmApi";
+import {
+  fetchPipelineStages,
+  createDeal,
+  updateDeal,
+  isConsultaSeguimientoInactive,
+} from "@/api/crmApi";
 
 const CATEGORIAS = ["iPhone", "Mac", "iPad", "AirPods", "Apple Watch", "Accesorios", "Otro"];
 const CANALES = ["Instagram", "WhatsApp", "MercadoLibre", "Referido", "Local", "Otro"];
@@ -404,14 +409,26 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Próximo seguimiento</Label>
-                <Input 
-                  type="date"
-                  value={formData.proximoSeguimiento}
-                  onChange={(e) => setFormData({ ...formData, proximoSeguimiento: e.target.value })}
-                />
-              </div>
+              {!isConsultaSeguimientoInactive({
+                etapa: formData.etapa,
+                concretado: formData.concretado,
+              }) ? (
+                <div className="space-y-2">
+                  <Label>Próximo seguimiento</Label>
+                  <Input
+                    type="date"
+                    value={formData.proximoSeguimiento}
+                    onChange={(e) =>
+                      setFormData({ ...formData, proximoSeguimiento: e.target.value })
+                    }
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 col-span-2">
+                  Consultas cerradas no llevan fecha de seguimiento. La postventa se gestiona en el
+                  módulo Postventa (ventas finalizadas).
+                </p>
+              )}
 
               {formData.etapa === "Perdido" && (
                 <div className="space-y-2 col-span-2">

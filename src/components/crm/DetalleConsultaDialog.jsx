@@ -10,6 +10,7 @@ import SelectorListasWhatsApp from "./SelectorListasWhatsApp";
 import HistorialEnvios from "./HistorialEnvios";
 import moment from "moment";
 import { X } from "lucide-react";
+import { isConsultaSeguimientoInactive } from "@/api/crmApi";
 
 export default function DetalleConsultaDialog({ consulta, open, onOpenChange, onSave }) {
   if (!consulta) return null;
@@ -76,12 +77,18 @@ export default function DetalleConsultaDialog({ consulta, open, onOpenChange, on
                       </p>
                     </div>
                   )}
-                  {consulta.proximoSeguimiento && (
-                    <div>
-                      <Label className="text-xs font-semibold text-slate-500">Próximo seguimiento</Label>
-                      <p className="text-sm mt-1">{moment(consulta.proximoSeguimiento).format("DD/MM/YYYY")}</p>
-                    </div>
-                  )}
+                  {!isConsultaSeguimientoInactive(consulta) &&
+                    consulta.proximoSeguimiento &&
+                    moment(consulta.proximoSeguimiento).isValid() && (
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-500">
+                          Próximo seguimiento
+                        </Label>
+                        <p className="text-sm mt-1">
+                          {moment(consulta.proximoSeguimiento).format("DD/MM/YYYY")}
+                        </p>
+                      </div>
+                    )}
                 </div>
               </CardContent>
             </Card>
