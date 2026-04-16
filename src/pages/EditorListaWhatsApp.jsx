@@ -10,12 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useCurrentUser } from "@/components/hooks/useCurrentUser";
+import { useWorkspace } from "@/components/context/WorkspaceContext";
 import { ArrowLeft, Copy, Archive, Save } from "lucide-react";
 import { toast } from "sonner";
 
 export default function EditorListaWhatsApp() {
   const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
+  const { workspace } = useWorkspace();
   const queryClient = useQueryClient();
 
   const params = new URLSearchParams(window.location.search);
@@ -35,8 +37,11 @@ export default function EditorListaWhatsApp() {
 
   const { data: lista } = useQuery({
     queryKey: ['lista', listaId],
-    queryFn: () => listaId ? crmClient.entities.ListaWhatsApp.filter({ id: listaId }) : Promise.resolve(null),
-    enabled: !!listaId
+    queryFn: () =>
+      listaId && workspace?.id
+        ? crmClient.entities.ListaWhatsApp.filter({ id: listaId, workspace_id: workspace.id })
+        : Promise.resolve(null),
+    enabled: !!listaId && !!workspace?.id
   });
 
   useEffect(() => {
@@ -60,7 +65,10 @@ export default function EditorListaWhatsApp() {
       if (listaId) {
         await crmClient.entities.ListaWhatsApp.update(listaId, data);
       } else {
-        await crmClient.entities.ListaWhatsApp.create(data);
+        await crmClient.entities.ListaWhatsApp.create({
+          ...data,
+          workspace_id: workspace?.id
+        });
       }
     },
     onSuccess: () => {
@@ -74,6 +82,7 @@ export default function EditorListaWhatsApp() {
     mutationFn: async () => {
       await crmClient.entities.ListaWhatsApp.create({
         ...form,
+        workspace_id: workspace?.id,
         nombre: `${form.nombre} (Copia)`,
         tags: form.tags ? form.tags.split(",").map(t => t.trim()) : [],
         estado: "Borrador"
@@ -89,6 +98,10 @@ export default function EditorListaWhatsApp() {
   const handleSave = async () => {
     if (!form.nombre || !form.texto) {
       toast.error("Nombre y texto son obligatorios");
+      return;
+    }
+    if (!workspace?.id) {
+      toast.error("Workspace no disponible");
       return;
     }
 

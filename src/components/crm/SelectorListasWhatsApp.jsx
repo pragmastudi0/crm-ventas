@@ -7,18 +7,26 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Copy, Send } from "lucide-react";
 import { toast } from "sonner";
+import { useWorkspace } from "@/components/context/WorkspaceContext";
 
 export default function SelectorListasWhatsApp({ contactoId, contactoWhatsapp, consultaId, onMessageSent }) {
   const [selectedListaId, setSelectedListaId] = useState(null);
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
+  const { workspace } = useWorkspace();
 
   const { data: listas = [] } = useQuery({
-    queryKey: ['listas-publicadas'],
+    queryKey: ['listas-publicadas', workspace?.id],
     queryFn: async () => {
-      const allListas = await crmClient.entities.ListaWhatsApp.list("-updated_date", 1000);
+      if (!workspace?.id) return [];
+      const allListas = await crmClient.entities.ListaWhatsApp.filter(
+        { workspace_id: workspace.id },
+        "-updated_date",
+        1000
+      );
       return allListas.filter(l => l.estado === "Publicada");
-    }
+    },
+    enabled: !!workspace?.id
   });
 
   const selectedLista = useMemo(() => {
@@ -36,6 +44,7 @@ export default function SelectorListasWhatsApp({ contactoId, contactoWhatsapp, c
     mutationFn: async (accion) => {
       // Crear log de envío
       await crmClient.entities.EnvioWhatsApp.create({
+        workspace_id: workspace?.id,
         contactoId,
         consultaId: consultaId || null,
         listaId: selectedListaId,
@@ -45,7 +54,10 @@ export default function SelectorListasWhatsApp({ contactoId, contactoWhatsapp, c
 
       // Actualizar ultimoContacto en Consulta si existe
       if (consultaId) {
-        const consultas = await crmClient.entities.Consulta.filter({ id: consultaId });
+        const consultas = await crmClient.entities.Consulta.filter({
+          id: consultaId,
+          workspace_id: workspace?.id
+        });
         if (consultas.length > 0) {
           await crmClient.entities.Consulta.update(consultaId, {
             ultimoContacto: new Date().toISOString()

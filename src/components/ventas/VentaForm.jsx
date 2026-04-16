@@ -140,6 +140,10 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
   }, [formData.costo, formData.venta, formData.comision, formData.canje]);
 
   const handleSubmit = async (finalizar = false) => {
+    if (!workspace?.id) {
+      toast.error("Workspace no disponible");
+      return;
+    }
     if (!formData.nombreSnapshot) {
       toast.error("El nombre del cliente es obligatorio");
       return;
@@ -181,7 +185,11 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
         onVentaCreada?.();
         onOpenChange(false);
       } else {
-        const ventas = await crmClient.entities.Venta.list("-created_date", 1);
+        const ventas = await crmClient.entities.Venta.filter(
+          { workspace_id: workspace.id },
+          "-created_date",
+          1
+        );
         let nuevoCodigo = `V-${new Date().getFullYear()}-000001`;
         if (ventas.length > 0 && ventas[0].codigo) {
           const partes = ventas[0].codigo.split('-');

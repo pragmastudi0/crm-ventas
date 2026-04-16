@@ -29,7 +29,7 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
   const { data: etapas = [] } = useQuery({
     queryKey: ['pipeline-stages', workspace?.id],
     queryFn: () => (workspace ? fetchPipelineStages(workspace.id) : []),
-    enabled: open && !!workspace
+    enabled: open && !!workspace?.id
   });
   
   const [formData, setFormData] = useState({
@@ -140,7 +140,7 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
     dataToSave.stage_id = stage?.id || null;
 
     if (consulta) {
-      await updateDeal(consulta.id, dataToSave);
+      await updateDeal(workspace?.id, consulta.id, dataToSave);
       toast.success("Consulta actualizada");
     } else {
       await createDeal(workspace?.id, dataToSave);

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Toaster } from "sonner";
-import { WorkspaceProvider } from "@/components/context/WorkspaceContext";
+import { WorkspaceProvider, useWorkspace } from "@/components/context/WorkspaceContext";
 
 const NAV_ITEMS = [
   { name: "Home", icon: LayoutDashboard, page: "Home" },
@@ -23,12 +23,38 @@ const NAV_ITEMS = [
   { name: "Ajustes", icon: Users, page: "Ajustes" },
 ];
 
+function WorkspaceGuard({ children }) {
+  const { workspaceLoading, workspaceError } = useWorkspace();
+
+  if (workspaceLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (workspaceError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-md w-full rounded-xl border border-red-200 bg-red-50 p-5">
+          <h2 className="text-base font-semibold text-red-700 mb-2">Error de workspace</h2>
+          <p className="text-sm text-red-600">{workspaceError}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return children;
+}
+
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <WorkspaceProvider>
+      <WorkspaceGuard>
       <div className="min-h-screen bg-slate-50">
       <Toaster position="top-right" richColors />
       
@@ -130,6 +156,7 @@ export default function Layout({ children, currentPageName }) {
         {children}
       </main>
       </div>
+      </WorkspaceGuard>
     </WorkspaceProvider>
   );
 }

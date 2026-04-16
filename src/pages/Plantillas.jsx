@@ -60,9 +60,10 @@ export default function Plantillas() {
   const { workspace } = useWorkspace();
 
   const { data: plantillas = [], refetch } = useQuery({
-    queryKey: ['plantillas', workspace?.id, currentUser?.email],
-    queryFn: () => workspace && currentUser ? crmClient.entities.PlantillaWhatsApp.filter({ workspace_id: workspace.id, created_by: currentUser.email }, "-created_date") : [],
-    enabled: !!workspace && !!currentUser
+    queryKey: ['plantillas', workspace?.id],
+    queryFn: () =>
+      workspace ? crmClient.entities.PlantillaWhatsApp.filter({ workspace_id: workspace.id }, "-created_date") : [],
+    enabled: !!workspace
   });
 
   const { data: variablesDB = [] } = useQuery({
@@ -72,7 +73,12 @@ export default function Plantillas() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => crmClient.entities.PlantillaWhatsApp.create({ ...data, workspace_id: workspace?.id }),
+    mutationFn: (data) =>
+      crmClient.entities.PlantillaWhatsApp.create({
+        ...data,
+        workspace_id: workspace?.id,
+        created_by: currentUser?.id || null
+      }),
     onSuccess: () => {
        queryClient.invalidateQueries({ queryKey: ['plantillas', workspace?.id] });
        toast.success("Plantilla creada");

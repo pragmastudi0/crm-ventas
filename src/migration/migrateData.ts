@@ -24,8 +24,12 @@ function transformRecord(entity: EntityKey, record: Record<string, unknown>) {
 
 async function readExport(entity: EntityKey) {
   const filePath = path.join(dataDir, `${entity}.json`);
-  const raw = await fs.readFile(filePath, "utf-8");
-  return JSON.parse(raw) as Array<Record<string, unknown>>;
+  try {
+    const raw = await fs.readFile(filePath, "utf-8");
+    return JSON.parse(raw) as Array<Record<string, unknown>>;
+  } catch {
+    return [];
+  }
 }
 
 async function upsertEntity(entity: EntityKey, records: Array<Record<string, unknown>>) {
@@ -53,7 +57,7 @@ async function upsertEntity(entity: EntityKey, records: Array<Record<string, unk
 }
 
 async function run() {
-  const entities: EntityKey[] = ["users", "contacts", "deals", "activities"];
+  const entities: EntityKey[] = ["users", "workspaces", "workspaceMembers", "contacts", "deals", "activities"];
   const summary: Record<string, { success: number; failure: number; total: number }> = {};
 
   for (const entity of entities) {
