@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { 
   LayoutDashboard, Kanban, List, Users, MessageSquare, Calendar,
@@ -24,7 +24,7 @@ const NAV_ITEMS = [
 ];
 
 function WorkspaceGuard({ children }) {
-  const { workspaceLoading, workspaceError } = useWorkspace();
+  const { workspace, workspaceLoading, workspaceError, refetchWorkspace } = useWorkspace();
 
   if (workspaceLoading) {
     return (
@@ -37,9 +37,28 @@ function WorkspaceGuard({ children }) {
   if (workspaceError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="max-w-md w-full rounded-xl border border-red-200 bg-red-50 p-5">
-          <h2 className="text-base font-semibold text-red-700 mb-2">Error de workspace</h2>
+        <div className="max-w-md w-full rounded-xl border border-red-200 bg-red-50 p-5 space-y-4">
+          <h2 className="text-base font-semibold text-red-700">Error de workspace</h2>
           <p className="text-sm text-red-600">{workspaceError}</p>
+          <Button variant="outline" className="w-full border-red-300" onClick={() => refetchWorkspace()}>
+            Reintentar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!workspace) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-md w-full rounded-xl border border-amber-200 bg-amber-50 p-5 space-y-4">
+          <h2 className="text-base font-semibold text-amber-900">No hay workspace activo</h2>
+          <p className="text-sm text-amber-800">
+            No se pudo resolver un workspace para tu sesión. Revisa la consola del navegador o vuelve a intentar.
+          </p>
+          <Button variant="outline" className="w-full border-amber-300" onClick={() => refetchWorkspace()}>
+            Reintentar
+          </Button>
         </div>
       </div>
     );

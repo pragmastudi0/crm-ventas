@@ -16,3 +16,7 @@ export const supabase = createClient(supabaseUrl || "", supabaseAnonKey || "", {
 });
 
 export const DATABASE_PREFIX = import.meta.env.VITE_DATABASE_PREFIX || "crm_ventas_tech";
+
+if (import.meta.env.DEV) {
+  console.info(`[AltatechCRM] Tablas Supabase: ${DATABASE_PREFIX}_*`);
+}
