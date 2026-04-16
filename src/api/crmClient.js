@@ -17,7 +17,7 @@ const ENTITY_TABLES = {
 };
 
 const normalizeSort = (sort) => {
-  if (!sort) return { column: "created_at", ascending: false };
+  if (!sort) return { column: "created_date", ascending: false };
   if (sort.startsWith("-")) return { column: sort.slice(1), ascending: false };
   return { column: sort, ascending: true };
 };
