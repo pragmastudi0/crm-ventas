@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -11,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ArrowLeft, Plus, Trash2, GripVertical, Edit2 } from "lucide-react";
 import { toast } from "sonner";
 import { useWorkspace } from "@/components/context/WorkspaceContext";
+import { createPipelineStage, updatePipelineStage, deletePipelineStage, fetchPipelineStages } from "@/api/crmApi";
 
 const COLORES_DISPONIBLES = [
   { nombre: "Azul", valor: "bg-blue-500" },
@@ -34,16 +34,12 @@ export default function ConfigurarPipeline() {
 
   const { data: etapas = [] } = useQuery({
     queryKey: ['pipeline-stages', workspace?.id],
-    queryFn: async () => {
-      if (!workspace) return [];
-      const stages = await base44.entities.PipelineStage.filter({ workspace_id: workspace.id }, "orden", 100);
-      return stages.filter(s => s.activa !== false);
-    },
+    queryFn: () => (workspace ? fetchPipelineStages(workspace.id) : []),
     enabled: !!workspace
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.PipelineStage.create({ ...data, workspace_id: workspace?.id }),
+    mutationFn: (data) => createPipelineStage(data.nombre, data.orden, data.color, workspace?.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline-stages', workspace?.id] });
       toast.success("Etapa creada");
@@ -53,7 +49,7 @@ export default function ConfigurarPipeline() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.PipelineStage.update(id, data),
+    mutationFn: ({ id, data }) => updatePipelineStage(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline-stages', workspace?.id] });
       toast.success("Etapa actualizada");
@@ -64,10 +60,13 @@ export default function ConfigurarPipeline() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.PipelineStage.update(id, { activa: false }),
+    mutationFn: (id) => deletePipelineStage(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline-stages', workspace?.id] });
       toast.success("Etapa eliminada");
+    },
+    onError: (error) => {
+      toast.error(error.message || "No se pudo eliminar la etapa");
     }
   });
 
@@ -80,10 +79,10 @@ export default function ConfigurarPipeline() {
     if (editando) {
       updateMutation.mutate({
         id: editando.id,
-        data: { ...formData }
+        data: { name: formData.nombre, color: formData.color }
       });
     } else {
-      const maxOrden = etapas.length > 0 ? Math.max(...etapas.map(e => e.orden)) : 0;
+      const maxOrden = etapas.length > 0 ? Math.max(...etapas.map(e => e.orden ?? 0)) : 0;
       createMutation.mutate({
         ...formData,
         orden: maxOrden + 1,
@@ -94,7 +93,7 @@ export default function ConfigurarPipeline() {
 
   const handleEdit = (etapa) => {
     setEditando(etapa);
-    setFormData({ nombre: etapa.nombre, color: etapa.color });
+    setFormData({ nombre: etapa.nombre ?? etapa.name, color: etapa.color });
     setShowDialog(true);
   };
 
@@ -116,8 +115,8 @@ export default function ConfigurarPipeline() {
     const etapaTarget = etapas[targetIndex];
 
     await Promise.all([
-      base44.entities.PipelineStage.update(etapaActual.id, { orden: etapaTarget.orden }),
-      base44.entities.PipelineStage.update(etapaTarget.id, { orden: etapaActual.orden })
+      updatePipelineStage(etapaActual.id, { orden: etapaTarget.orden }),
+      updatePipelineStage(etapaTarget.id, { orden: etapaActual.orden })
     ]);
 
     queryClient.invalidateQueries({ queryKey: ['pipeline-stages', workspace?.id] });
@@ -175,7 +174,7 @@ export default function ConfigurarPipeline() {
                   </div>
                   <div className={`w-3 h-3 rounded-full ${etapa.color}`} />
                   <div className="flex-1">
-                    <p className="font-semibold text-slate-900">{etapa.nombre}</p>
+                    <p className="font-semibold text-slate-900">{etapa.nombre ?? etapa.name}</p>
                     <p className="text-xs text-slate-500">Orden: {etapa.orden}</p>
                   </div>
                 </div>
@@ -191,7 +190,7 @@ export default function ConfigurarPipeline() {
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      if (confirm(`¿Eliminar la etapa "${etapa.nombre}"?`)) {
+                      if (confirm(`¿Eliminar la etapa "${etapa.nombre ?? etapa.name}"?`)) {
                         deleteMutation.mutate(etapa.id);
                       }
                     }}

@@ -9,10 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Bell, User, Shield, Database, Trash2, Users, Loader2, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/components/hooks/useCurrentUser";
 import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function Configuracion() {
   const { data: currentUser } = useCurrentUser();
@@ -34,12 +34,17 @@ export default function Configuracion() {
   const handleSaveDays = async () => {
     setSavingDays(true);
     try {
-      await base44.auth.updateMe({
-        consulta_follow_up_days: Number(consultaDays),
-        postventa_follow_up_days: Number(postventaDays)
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          consulta_follow_up_days: Number(consultaDays),
+          postventa_follow_up_days: Number(postventaDays)
+        }
       });
+      if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['current-user'] });
       toast.success("Días hábiles guardados");
+    } catch (error) {
+      toast.error(error.message || "No se pudieron guardar los días");
     } finally {
       setSavingDays(false);
     }
@@ -59,10 +64,7 @@ export default function Configuracion() {
 
     setIsLoading(true);
     try {
-      await base44.users.inviteUser(inviteEmail, inviteRole);
-      toast.success(`Invitación enviada a ${inviteEmail}`);
-      setInviteEmail("");
-      setInviteRole("user");
+      toast.error("Invitaciones aún no migradas. Configura invitaciones con Supabase Auth Admin API.");
     } catch (error) {
       toast.error("Error al enviar la invitación");
     } finally {

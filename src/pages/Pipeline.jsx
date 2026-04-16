@@ -13,6 +13,7 @@ import { Plus, Filter, ArrowLeft, Settings } from "lucide-react";
 import { useWorkspace } from "@/components/context/WorkspaceContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { fetchPipelineStages, updateDeal } from "@/api/crmApi";
 
 export default function Pipeline() {
   const [showForm, setShowForm] = useState(false);
@@ -33,16 +34,12 @@ export default function Pipeline() {
 
   const { data: etapas = [] } = useQuery({
     queryKey: ['pipeline-stages', workspace?.id],
-    queryFn: async () => {
-      if (!workspace) return [];
-      const stages = await base44.entities.PipelineStage.filter({ workspace_id: workspace.id }, "orden", 100);
-      return stages.filter(s => s.activa !== false);
-    },
+    queryFn: () => (workspace ? fetchPipelineStages(workspace.id) : []),
     enabled: !!workspace
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Consulta.update(id, data),
+    mutationFn: ({ id, data }) => updateDeal(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultas-pipeline', workspace?.id] });
     }
@@ -53,13 +50,17 @@ export default function Pipeline() {
 
     const { draggableId, destination } = result;
     const newEtapa = destination.droppableId;
+    const stage = etapas.find((item) => (item.id || item.name || item.nombre) === newEtapa);
 
     updateMutation.mutate({
       id: draggableId,
-      data: { etapa: newEtapa }
+      data: {
+        stage_id: stage?.id || null,
+        etapa: stage?.name ?? stage?.nombre ?? newEtapa
+      }
     });
 
-    toast.success(`Movido a ${newEtapa}`);
+    toast.success(`Movido a ${stage?.name ?? stage?.nombre ?? newEtapa}`);
   };
 
   const handleWhatsApp = (consulta) => {
@@ -81,7 +82,7 @@ export default function Pipeline() {
   const handleMarcarPerdido = async (consulta, motivo) => {
     await updateMutation.mutateAsync({
       id: consulta.id,
-      data: { etapa: "Perdido", motivoPerdida: motivo }
+      data: { etapa: "Perdido", motivoPerdida: motivo, stage_id: null }
     });
     toast.success(`Marcado como Perdido — ${motivo}`);
   };
@@ -90,7 +91,8 @@ export default function Pipeline() {
     if (selectedConsulta) {
       await base44.entities.Consulta.update(selectedConsulta.id, {
         etapa: "Concretado",
-        concretado: true
+        concretado: true,
+        stage_id: null
       });
       queryClient.invalidateQueries({ queryKey: ['consultas-pipeline'] });
       toast.success("Venta registrada y consulta marcada como Concretado");
@@ -111,7 +113,9 @@ export default function Pipeline() {
 
   // Agrupar por etapa
   const consultasPorEtapa = etapas.reduce((acc, etapa) => {
-    acc[etapa.nombre] = consultasFiltradas.filter(c => c.etapa === etapa.nombre);
+    const stageName = etapa.name ?? etapa.nombre;
+    const key = etapa.id || stageName;
+    acc[key] = consultasFiltradas.filter((c) => c.stage_id === etapa.id || c.etapa === stageName);
     return acc;
   }, {});
 
@@ -176,18 +180,22 @@ export default function Pipeline() {
       <div className="p-6 overflow-x-auto">
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="flex gap-4 min-w-max">
-            {etapas.map(etapa => (
-              <PipelineColumn
-                key={etapa.nombre}
-                etapa={etapa.nombre}
-                etapaColor={etapa.color}
-                consultas={consultasPorEtapa[etapa.nombre]}
-                onWhatsApp={handleWhatsApp}
-                onEdit={handleEdit}
-                onConcretarVenta={handleConcretarVenta}
-                onMarcarPerdido={handleMarcarPerdido}
-              />
-            ))}
+            {etapas.map(etapa => {
+              const stageName = etapa.name ?? etapa.nombre;
+              const stageKey = etapa.id || stageName;
+              return (
+                <PipelineColumn
+                  key={stageKey}
+                  etapa={stageName}
+                  etapaColor={etapa.color}
+                  consultas={consultasPorEtapa[stageKey]}
+                  onWhatsApp={handleWhatsApp}
+                  onEdit={handleEdit}
+                  onConcretarVenta={handleConcretarVenta}
+                  onMarcarPerdido={handleMarcarPerdido}
+                />
+              );
+            })}
           </div>
         </DragDropContext>
       </div>

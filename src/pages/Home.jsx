@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import moment from "moment";
+import { fetchPipelineStages } from "@/api/crmApi";
 
 const COLORS = ["#3b82f6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
 const CANALES = ["Instagram", "WhatsApp", "MercadoLibre", "Referido", "Local", "Otro"];
@@ -38,8 +39,19 @@ export default function Home() {
     queryFn: () => workspace ? base44.entities.Venta.filter({ workspace_id: workspace.id }, "-fecha", 500) : [],
     enabled: !!workspace
   });
+  const { data: stages = [] } = useQuery({
+    queryKey: ['pipeline-stages', workspace?.id],
+    queryFn: () => (workspace ? fetchPipelineStages(workspace.id) : []),
+    enabled: !!workspace
+  });
 
   const today = moment();
+  const closedStages = stages.filter((s) => /concretad|closed|won/i.test(s.name ?? s.nombre));
+  const lostStages = stages.filter((s) => /perdid|lost/i.test(s.name ?? s.nombre));
+  const isClosedOrLost = (consulta) =>
+    closedStages.some((s) => s.id === consulta.stage_id) ||
+    lostStages.some((s) => s.id === consulta.stage_id) ||
+    ["Concretado", "Perdido"].includes(consulta.etapa);
   
   // KPIs
   const nuevasHoy = consultas.filter(c => moment(c.fechaConsulta).isSame(today, 'day')).length;
@@ -48,13 +60,13 @@ export default function Home() {
   const pendientesHoy = consultas.filter(c => 
     c.proximoSeguimiento && 
     moment(c.proximoSeguimiento).isSame(today, 'day') &&
-    !["Concretado", "Perdido"].includes(c.etapa)
+    !isClosedOrLost(c)
   );
   
   const vencidos = consultas.filter(c => 
     c.proximoSeguimiento && 
     moment(c.proximoSeguimiento).isBefore(today, 'day') &&
-    !["Concretado", "Perdido"].includes(c.etapa)
+    !isClosedOrLost(c)
   );
 
   const enNegociacion = consultas.filter(c => c.etapa === "Negociacion").length;
@@ -72,9 +84,13 @@ export default function Home() {
   // Dashboard avanzado KPIs
   const last7Days = consultas.filter(c => moment(c.created_date).isAfter(today.clone().subtract(7, 'days')));
   const last30Days = consultas.filter(c => moment(c.created_date).isAfter(today.clone().subtract(30, 'days')));
-  const concretados = consultas.filter(c => c.etapa === "Concretado");
-  const perdidos = consultas.filter(c => c.etapa === "Perdido");
-  const activos = consultas.filter(c => !["Concretado", "Perdido"].includes(c.etapa));
+  const concretados = consultas.filter(
+    (c) => closedStages.some((s) => s.id === c.stage_id) || c.etapa === "Concretado"
+  );
+  const perdidos = consultas.filter(
+    (c) => lostStages.some((s) => s.id === c.stage_id) || c.etapa === "Perdido"
+  );
+  const activos = consultas.filter((c) => !isClosedOrLost(c));
   const tasaConversion = consultas.length > 0 ? ((concretados.length / consultas.length) * 100).toFixed(1) : 0;
 
   const ventasMesActual = ventas.filter(v => v.fecha && moment(v.fecha).isSame(today, 'month') && v.estado === "Finalizada");
@@ -83,7 +99,7 @@ export default function Home() {
   const seguimientosHoy = consultas.filter(c =>
     c.proximoSeguimiento &&
     moment(c.proximoSeguimiento).isSameOrBefore(today, 'day') &&
-    !["Concretado", "Perdido"].includes(c.etapa)
+    !isClosedOrLost(c)
   );
 
   const leadsPorCanal = CANALES.reduce((acc, canal) => {

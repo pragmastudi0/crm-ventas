@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { User, Package, DollarSign, Calendar, Plus } from "lucide-react";
 import moment from "moment";
 import { getNextBusinessDay } from "@/components/utils/dateUtils";
+import { fetchPipelineStages, createDeal, updateDeal } from "@/api/crmApi";
 
 const CATEGORIAS = ["iPhone", "Mac", "iPad", "AirPods", "Apple Watch", "Accesorios", "Otro"];
 const CANALES = ["Instagram", "WhatsApp", "MercadoLibre", "Referido", "Local", "Otro"];
@@ -27,11 +28,7 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
 
   const { data: etapas = [] } = useQuery({
     queryKey: ['pipeline-stages', workspace?.id],
-    queryFn: async () => {
-      if (!workspace) return [];
-      const stages = await base44.entities.PipelineStage.filter({ workspace_id: workspace.id }, "orden", 100);
-      return stages.filter(s => s.activa !== false);
-    },
+    queryFn: () => (workspace ? fetchPipelineStages(workspace.id) : []),
     enabled: open && !!workspace
   });
   
@@ -139,12 +136,14 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
     if (formData.concretado && formData.etapa !== "Concretado") {
       dataToSave.etapa = "Concretado";
     }
+    const stage = etapas.find((item) => (item.name ?? item.nombre) === dataToSave.etapa);
+    dataToSave.stage_id = stage?.id || null;
 
     if (consulta) {
-      await base44.entities.Consulta.update(consulta.id, dataToSave);
+      await updateDeal(consulta.id, dataToSave);
       toast.success("Consulta actualizada");
     } else {
-      await base44.entities.Consulta.create(dataToSave);
+      await createDeal(workspace?.id, dataToSave);
       toast.success("Consulta creada");
     }
 
@@ -362,9 +361,14 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {etapas.map(e => (
-                      <SelectItem key={e.nombre} value={e.nombre}>{e.nombre}</SelectItem>
-                    ))}
+                    {etapas.map((e) => {
+                      const stageName = e.name ?? e.nombre;
+                      return (
+                        <SelectItem key={e.id || stageName} value={stageName}>
+                          {stageName}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
