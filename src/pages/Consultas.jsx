@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { crmClient } from "@/api/crmClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "@/components/hooks/useCurrentUser";
@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
   Plus, Search, MessageCircle, Calendar, CheckCircle2, XCircle,
-  MoreHorizontal, ArrowUpDown, ArrowLeft, Trash2, ListCheck
+  MoreHorizontal, ArrowUpDown, ArrowLeft, Trash2, ListCheck, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import moment from "moment";
@@ -47,18 +47,24 @@ export default function Consultas() {
   const [filtroPrioridad, setFiltroPrioridad] = useState("todas");
   const [sortField, setSortField] = useState("created_date");
   const [sortOrder, setSortOrder] = useState("desc");
+  const [listPage, setListPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const { workspace } = useWorkspace();
 
-  // Cargar TODAS las consultas (sin límite artificial)
   const { data: consultas = [], refetch, isLoading } = useQuery({
     queryKey: ['consultas-list', workspace?.id],
-    queryFn: () => workspace
-      ? crmClient.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 2000)
-      : [],
-    enabled: !!workspace?.id
+    queryFn: () =>
+      workspace
+        ? crmClient.entities.Consulta.filterFetchAll(
+            { workspace_id: workspace.id },
+            "-created_date",
+            1000,
+          )
+        : [],
+    enabled: !!workspace?.id,
   });
 
   // Cargar etapas activas del pipeline dinámicamente
@@ -102,34 +108,60 @@ export default function Consultas() {
     return "bg-slate-100 text-slate-700";
   };
 
-  // Filtrar y ordenar
-  const consultasFiltradas = consultas
-    .filter(c => {
-      if (search) {
-        const searchLower = search.toLowerCase();
-        if (!c.contactoNombre?.toLowerCase().includes(searchLower) &&
-            !c.contactoWhatsapp?.includes(search) &&
-            !c.productoConsultado?.toLowerCase().includes(searchLower)) {
-          return false;
-        }
-      }
-      if (filtroEtapa !== "todas" && c.etapa !== filtroEtapa) return false;
-      if (filtroCanal !== "todos" && c.canalOrigen !== filtroCanal) return false;
-      if (filtroPrioridad !== "todas" && c.prioridad !== filtroPrioridad) return false;
-      return true;
-    })
-    .sort((a, b) => {
-      let valA = a[sortField];
-      let valB = b[sortField];
-      if (sortField === "precioCotizado") {
-        valA = valA || 0;
-        valB = valB || 0;
-      }
-      if (sortOrder === "desc") {
-        return valA > valB ? -1 : 1;
-      }
-      return valA < valB ? -1 : 1;
-    });
+  const consultasFiltradas = useMemo(
+    () =>
+      consultas
+        .filter((c) => {
+          if (search) {
+            const searchLower = search.toLowerCase();
+            if (
+              !c.contactoNombre?.toLowerCase().includes(searchLower) &&
+              !c.contactoWhatsapp?.includes(search) &&
+              !c.productoConsultado?.toLowerCase().includes(searchLower)
+            ) {
+              return false;
+            }
+          }
+          if (filtroEtapa !== "todas" && c.etapa !== filtroEtapa) return false;
+          if (filtroCanal !== "todos" && c.canalOrigen !== filtroCanal) return false;
+          if (filtroPrioridad !== "todas" && c.prioridad !== filtroPrioridad) return false;
+          return true;
+        })
+        .sort((a, b) => {
+          let valA = a[sortField];
+          let valB = b[sortField];
+          if (sortField === "precioCotizado") {
+            valA = valA || 0;
+            valB = valB || 0;
+          }
+          if (sortOrder === "desc") {
+            return valA > valB ? -1 : 1;
+          }
+          return valA < valB ? -1 : 1;
+        }),
+    [
+      consultas,
+      search,
+      filtroEtapa,
+      filtroCanal,
+      filtroPrioridad,
+      sortField,
+      sortOrder,
+    ],
+  );
+
+  const totalPages = Math.max(1, Math.ceil(consultasFiltradas.length / pageSize));
+  const safePage = Math.min(listPage, totalPages);
+  const pageStart = (safePage - 1) * pageSize;
+  const consultasPagina = consultasFiltradas.slice(pageStart, pageStart + pageSize);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [search, filtroEtapa, filtroCanal, filtroPrioridad, workspace?.id, sortField, sortOrder]);
+
+  useEffect(() => {
+    if (listPage > totalPages) setListPage(totalPages);
+  }, [listPage, totalPages]);
 
   const handleWhatsApp = (consulta) => {
     setSelectedConsulta(consulta);
@@ -193,7 +225,11 @@ export default function Consultas() {
               </Link>
               <h1 className="text-2xl font-bold text-slate-900">Consultas</h1>
               <p className="text-slate-500">
-                {isLoading ? "Cargando..." : `${consultasFiltradas.length} de ${consultas.length} consultas`}
+                {isLoading
+                  ? "Cargando..."
+                  : consultasFiltradas.length === 0
+                    ? "0 consultas"
+                    : `Mostrando ${pageStart + 1}–${Math.min(pageStart + consultasPagina.length, consultasFiltradas.length)} de ${consultasFiltradas.length} (${consultas.length} en el workspace)`}
               </p>
             </div>
             {currentUser?.canEditContacts && (
@@ -261,6 +297,24 @@ export default function Consultas() {
                 <SelectItem value="Baja">Baja</SelectItem>
               </SelectContent>
             </Select>
+
+            <Select
+              value={String(pageSize)}
+              onValueChange={(v) => {
+                setPageSize(Number(v));
+                setListPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[130px]">
+                <SelectValue placeholder="Por página" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25 por página</SelectItem>
+                <SelectItem value="50">50 por página</SelectItem>
+                <SelectItem value="100">100 por página</SelectItem>
+                <SelectItem value="200">200 por página</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>
@@ -295,7 +349,7 @@ export default function Consultas() {
                   </TableCell>
                 </TableRow>
               ) : (
-                consultasFiltradas.map(consulta => {
+                consultasPagina.map((consulta) => {
                   const seguimientoVencido = consulta.proximoSeguimiento &&
                     moment(consulta.proximoSeguimiento).isBefore(moment(), 'day');
 
@@ -461,6 +515,38 @@ export default function Consultas() {
               )}
             </TableBody>
           </Table>
+
+          {!isLoading && consultasFiltradas.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+              <p className="text-sm text-slate-600">
+                Página {safePage} de {totalPages}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={safePage <= 1}
+                  onClick={() => setListPage(safePage - 1)}
+                  className="gap-1"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Anterior
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setListPage(safePage + 1)}
+                  className="gap-1"
+                >
+                  Siguiente
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
