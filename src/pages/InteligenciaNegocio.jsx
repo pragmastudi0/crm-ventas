@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { crmClient } from "@/api/crmClient";
 import { useQuery } from "@tanstack/react-query";
 import { useWorkspace } from "@/components/context/WorkspaceContext";
+import { supabase } from "@/lib/supabaseClient";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { ArrowLeft, TrendingUp, Target, Zap, BarChart2, RefreshCw, Sparkles, MessageCircle } from "lucide-react";
@@ -87,6 +88,47 @@ function ManualToggleRow({ label, subAuto, subManual, active, onToggle, children
 
 function ActividadContacto({ workspace }) {
   const [rango, setRango] = useState(7);
+  const { data: consultas = [] } = useQuery({
+    queryKey: ["ib-actividad-consultas", workspace?.id],
+    queryFn: () =>
+      workspace
+        ? crmClient.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 2000)
+        : [],
+    enabled: !!workspace?.id
+  });
+
+  const nombrePorConsultaId = useMemo(() => {
+    const m = new Map();
+    consultas.forEach((q) => {
+      if (q?.id) m.set(q.id, q.contactoNombre?.trim() || null);
+    });
+    return m;
+  }, [consultas]);
+
+  const nombrePorContactoId = useMemo(() => {
+    const m = new Map();
+    consultas.forEach((q) => {
+      const name = q?.contactoNombre?.trim();
+      if (q?.contactoId && name) m.set(q.contactoId, name);
+    });
+    return m;
+  }, [consultas]);
+
+  const resolveClienteNombre = (consultaId, contactoId, nombreEnFila) => {
+    if (nombreEnFila?.trim()) return nombreEnFila.trim();
+    if (consultaId) {
+      const n = nombrePorConsultaId.get(consultaId);
+      if (n) return n;
+    }
+    if (contactoId) {
+      const n = nombrePorContactoId.get(contactoId);
+      if (n) return n;
+    }
+    if (contactoId) return String(contactoId);
+    if (consultaId) return `Consulta (${String(consultaId).slice(0, 8)})`;
+    return "Sin nombre";
+  };
+
   const { data: envios = [] } = useQuery({
     queryKey: ["ib-actividad-envios", workspace?.id],
     queryFn: () =>
@@ -108,13 +150,15 @@ function ActividadContacto({ workspace }) {
     ...envios.map((e) => ({
       fecha: e.created_date,
       consultaId: e.consultaId,
-      nombre: e.contactoNombre || e.contactoId || "Contacto",
+      contactoId: e.contactoId,
+      nombre: resolveClienteNombre(e.consultaId, e.contactoId, e.contactoNombre),
       tipo: "whatsapp"
     })),
     ...mensajes.map((m) => ({
       fecha: m.created_date,
       consultaId: m.consultaId,
-      nombre: m.contactoNombre || m.contactoId || "Contacto",
+      contactoId: m.contactoId,
+      nombre: resolveClienteNombre(m.consultaId, m.contactoId, m.contactoNombre),
       tipo: "seguimiento"
     }))
   ].filter((item) => item.fecha);
@@ -144,8 +188,12 @@ function ActividadContacto({ workspace }) {
   });
 
   const topRecontactos = Object.entries(recontactosPorConsulta)
-    .map(([id, d]) => ({ id, nombre: d.nombre, count: d.count }))
-    .filter(r => r.count > 1)
+    .map(([id, d]) => ({
+      id,
+      nombre: nombrePorConsultaId.get(id) || d.nombre,
+      count: d.count
+    }))
+    .filter((r) => r.count > 1)
     .sort((a, b) => b.count - a.count)
     .slice(0, 7);
 
@@ -306,6 +354,8 @@ ${aiData.topProveedores.slice(0, 4).map((p, i) => `  ${i + 1}. ${p.name}: ${usd(
 CANALES (por ganancia):
 ${aiData.canales.slice(0, 4).map(c => `  ${c.name}: ${c.ventas} ventas, conversión ${c.conversion}%, ganancia ${usd(c.ganancia)}`).join("\n")}
 
+${aiData.promptContextExtra || ""}
+
 Respondé con 3 secciones cortas y directas:
 1. **Lo que está funcionando bien** (2-3 puntos)
 2. **Lo que hay que mejorar urgente** (2-3 puntos con acciones concretas)
@@ -314,18 +364,67 @@ Respondé con 3 secciones cortas y directas:
 Sé específico con los números. No uses frases genéricas. Máximo 350 palabras.`;
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setAnalysis("Iniciá sesión para usar el análisis IA.");
+        setLoading(false);
+        return;
+      }
+
+      const baseUrl = (import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
+      const anon = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+      if (!baseUrl || !anon) {
+        setAnalysis("Falta configurar Supabase (URL o anon key).");
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${baseUrl}/functions/v1/analyze-business`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          stream: true,
-          messages: [{ role: "user", content: prompt }]
-        })
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: anon
+        },
+        body: JSON.stringify({ prompt, stream: true })
       });
 
-      const reader = response.body.getReader();
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!response.ok) {
+        let msg = `Error ${response.status}`;
+        try {
+          if (contentType.includes("application/json")) {
+            const j = await response.json();
+            msg = j.error || j.detail || msg;
+          } else {
+            const t = await response.text();
+            if (t) msg = t.slice(0, 400);
+          }
+        } catch {
+          /* ignore */
+        }
+        setAnalysis(`No se pudo generar el análisis: ${msg}`);
+        setLoading(false);
+        return;
+      }
+
+      if (contentType.includes("application/json")) {
+        const j = await response.json();
+        setAnalysis(j.text || "");
+        setDone(true);
+        setLoading(false);
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        setAnalysis("No se pudo leer la respuesta del servidor.");
+        setLoading(false);
+        return;
+      }
       const decoder = new TextDecoder();
       let buffer = "";
       while (true) {
@@ -333,7 +432,7 @@ Sé específico con los números. No uses frases genéricas. Máximo 350 palabra
         if (streamDone) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        buffer = lines.pop();
+        buffer = lines.pop() || "";
         for (const line of lines) {
           if (line.startsWith("data: ")) {
             const raw = line.slice(6).trim();
@@ -341,15 +440,19 @@ Sé específico con los números. No uses frases genéricas. Máximo 350 palabra
             try {
               const json = JSON.parse(raw);
               if (json.type === "content_block_delta" && json.delta?.text) {
-                setAnalysis(prev => prev + json.delta.text);
+                setAnalysis((prev) => prev + json.delta.text);
               }
-            } catch {}
+            } catch {
+              /* línea SSE parcial */
+            }
           }
         }
       }
       setDone(true);
     } catch (err) {
-      setAnalysis("❌ Error al conectar con la IA. Intentá de nuevo.");
+      setAnalysis(
+        `Error al conectar con la IA: ${err?.message || "Intentá de nuevo."}`
+      );
     } finally {
       setLoading(false);
     }
@@ -422,6 +525,23 @@ export default function InteligenciaNegocio() {
   const { data: consultas = [] } = useQuery({
     queryKey: ["ib-consultas", workspace?.id],
     queryFn: () => workspace ? crmClient.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 2000) : [],
+    enabled: !!workspace
+  });
+
+  const { data: enviosActividad = [] } = useQuery({
+    queryKey: ["ib-actividad-envios", workspace?.id],
+    queryFn: () =>
+      workspace
+        ? crmClient.entities.EnvioWhatsApp.filter({ workspace_id: workspace.id }, "-created_date", 2000)
+        : [],
+    enabled: !!workspace
+  });
+  const { data: mensajesActividad = [] } = useQuery({
+    queryKey: ["ib-actividad-mensajes", workspace?.id],
+    queryFn: () =>
+      workspace
+        ? crmClient.entities.Mensaje.filter({ workspace_id: workspace.id }, "-created_date", 2000)
+        : [],
     enabled: !!workspace
   });
 
@@ -506,7 +626,126 @@ export default function InteligenciaNegocio() {
   const yaAlcanzado = objNum > 0 && faltaGanar <= 0;
   const calculadoraLista = gpEfectiva > 0 && tdcEfectiva > 0;
 
-  const aiData = { totalVentas, totalConsultas, totalGanancia, tasaConversion, ticketPromedio, gananciaProm, topProductos, topProveedores, canales };
+  const promptContextExtra = useMemo(() => {
+    const windowStart = moment().subtract(30, "days");
+    const consultasVentana = consultas.filter((c) =>
+      moment(c.created_date).isAfter(windowStart)
+    );
+
+    const byEtapa = {};
+    consultasVentana.forEach((c) => {
+      const e = c.etapa || "Sin etapa";
+      byEtapa[e] = (byEtapa[e] || 0) + 1;
+    });
+    const embudoLines = Object.keys(byEtapa).length
+      ? Object.entries(byEtapa)
+          .sort((a, b) => b[1] - a[1])
+          .map(([k, v]) => `  - ${k}: ${v}`)
+          .join("\n")
+      : "  (sin consultas en ventana)";
+
+    const tendLines = meses.map((m) => `  - ${m.label}: ${usd(m.ganancia)}`).join("\n");
+
+    const nombrePorConsultaId = new Map();
+    const nombrePorContactoId = new Map();
+    consultas.forEach((q) => {
+      if (q?.id) nombrePorConsultaId.set(q.id, q.contactoNombre?.trim() || null);
+      const name = q?.contactoNombre?.trim();
+      if (q?.contactoId && name) nombrePorContactoId.set(q.contactoId, name);
+    });
+
+    const resolveNombre = (consultaId, contactoId, nombreEnFila) => {
+      if (nombreEnFila?.trim()) return nombreEnFila.trim();
+      if (consultaId) {
+        const n = nombrePorConsultaId.get(consultaId);
+        if (n) return n;
+      }
+      if (contactoId) {
+        const n = nombrePorContactoId.get(contactoId);
+        if (n) return n;
+      }
+      if (contactoId) return String(contactoId);
+      if (consultaId) return `Consulta (${String(consultaId).slice(0, 8)})`;
+      return "Sin nombre";
+    };
+
+    const todos = [
+      ...enviosActividad.map((e) => ({
+        fecha: e.created_date,
+        consultaId: e.consultaId,
+        contactoId: e.contactoId,
+        nombre: resolveNombre(e.consultaId, e.contactoId, e.contactoNombre)
+      })),
+      ...mensajesActividad.map((m) => ({
+        fecha: m.created_date,
+        consultaId: m.consultaId,
+        contactoId: m.contactoId,
+        nombre: resolveNombre(m.consultaId, m.contactoId, m.contactoNombre)
+      }))
+    ].filter(
+      (item) => item.fecha && moment(item.fecha).isAfter(windowStart)
+    );
+
+    const recontactosPorConsulta = {};
+    todos.forEach((c) => {
+      if (!c.consultaId) return;
+      recontactosPorConsulta[c.consultaId] = recontactosPorConsulta[c.consultaId] || {
+        nombre: c.nombre,
+        count: 0
+      };
+      recontactosPorConsulta[c.consultaId].count++;
+    });
+
+    const top3 = Object.entries(recontactosPorConsulta)
+      .map(([id, d]) => ({
+        id,
+        nombre: nombrePorConsultaId.get(id) || d.nombre,
+        count: d.count
+      }))
+      .filter((r) => r.count > 1)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+
+    const top3Lines =
+      top3.length > 0
+        ? top3.map((r, i) => `  ${i + 1}. ${r.nombre}: ${r.count} contactos`).join("\n")
+        : "  (sin recontactos múltiples en el período)";
+
+    const objN = parseFloat(objetivo) || 0;
+    let objetivoBlock = "";
+    if (objN > 0) {
+      const falta = Math.max(0, objN - gananciaMes);
+      objetivoBlock = `\nOBJETIVO Y PROGRESO (mes actual):\n- Meta ganancia: ${usd(objN)}\n- Ya ganado: ${usd(gananciaMes)}\n- Falta: ${usd(falta)}\n`;
+    }
+
+    return (
+      `CONTEXTO ADICIONAL:\n\nEMBUDO — consultas últimos 30 días por etapa:\n${embudoLines}\n\n` +
+      `TENDENCIA — ganancia por mes (4 meses):\n${tendLines}\n- Variación aprox. mes más reciente vs anterior: ${tendencia}%\n\n` +
+      `ACTIVIDAD — WhatsApp + seguimientos registrados (últimos 30 días):\n- Total eventos: ${todos.length}\n- Consultas con más recontactos:\n${top3Lines}` +
+      objetivoBlock
+    );
+  }, [
+    consultas,
+    meses,
+    tendencia,
+    enviosActividad,
+    mensajesActividad,
+    objetivo,
+    gananciaMes
+  ]);
+
+  const aiData = {
+    totalVentas,
+    totalConsultas,
+    totalGanancia,
+    tasaConversion,
+    ticketPromedio,
+    gananciaProm,
+    topProductos,
+    topProveedores,
+    canales,
+    promptContextExtra
+  };
   const barColors = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#06b6d4", "#8b5cf6"];
 
   function ManualInput({ value, onChange, prefix, suffix, placeholder }) {

@@ -1,0 +1,5 @@
+# Config mínima para Edge Functions. Ajustá project_id con `supabase link`.
+# https://supabase.com/docs/guides/functions
+
+[functions.analyze-business]
+verify_jwt = true
