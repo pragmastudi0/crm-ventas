@@ -15,7 +15,7 @@ export default function VentasDashboard() {
 
   const { data: ventas = [], isLoading } = useQuery({
     queryKey: ['ventas', workspace?.id],
-    queryFn: () => workspace ? crmClient.entities.Venta.filter({ workspace_id: workspace.id }, "-created_date") : [],
+    queryFn: () => workspace ? crmClient.entities.Venta.filter({ workspace_id: workspace.id }, "-fecha") : [],
     enabled: !!workspace
   });
 
