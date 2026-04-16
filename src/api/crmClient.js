@@ -108,7 +108,7 @@ const auth = {
   }
 };
 
-export const base44 = {
+export const crmClient = {
   entities,
   auth,
   users: {

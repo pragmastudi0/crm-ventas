@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { crmClient } from "@/api/crmClient";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,25 +22,25 @@ export default function Reportes() {
 
   const { data: ventas = [], isLoading: isLoadingVentas } = useQuery({
     queryKey: ['ventas-reportes', workspace?.id],
-    queryFn: () => workspace ? base44.entities.Venta.filter({ workspace_id: workspace.id }, "-fecha", 500) : [],
+    queryFn: () => workspace ? crmClient.entities.Venta.filter({ workspace_id: workspace.id }, "-fecha", 500) : [],
     enabled: !!workspace
   });
 
   const { data: consultas = [] } = useQuery({
     queryKey: ['consultas-reportes', workspace?.id],
-    queryFn: () => workspace ? base44.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 1000) : [],
+    queryFn: () => workspace ? crmClient.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 1000) : [],
     enabled: !!workspace
   });
 
   const { data: proveedores = [] } = useQuery({
     queryKey: ['proveedores-reportes', workspace?.id],
-    queryFn: () => workspace ? base44.entities.Proveedor.filter({ workspace_id: workspace.id }) : [],
+    queryFn: () => workspace ? crmClient.entities.Proveedor.filter({ workspace_id: workspace.id }) : [],
     enabled: !!workspace
   });
 
   const { data: users = [] } = useQuery({
     queryKey: ['users-reportes'],
-    queryFn: () => base44.entities.User.list(),
+    queryFn: () => crmClient.entities.User.list(),
   });
 
   const dias = parseInt(periodo);

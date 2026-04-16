@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { crmClient } from "@/api/crmClient";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -15,7 +15,7 @@ export default function VentasDashboard() {
 
   const { data: ventas = [], isLoading } = useQuery({
     queryKey: ['ventas', workspace?.id],
-    queryFn: () => workspace ? base44.entities.Venta.filter({ workspace_id: workspace.id }, "-created_date") : [],
+    queryFn: () => workspace ? crmClient.entities.Venta.filter({ workspace_id: workspace.id }, "-created_date") : [],
     enabled: !!workspace
   });
 

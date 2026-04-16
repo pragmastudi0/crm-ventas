@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { crmClient } from "@/api/crmClient";
 
 const WorkspaceContext = createContext(null);
 
@@ -13,29 +13,29 @@ export function WorkspaceProvider({ children }) {
 
   const bootstrapWorkspace = async () => {
     try {
-      const user = await base44.auth.me();
+      const user = await crmClient.auth.me();
       if (!user) {
         setWorkspaceLoading(false);
         return;
       }
 
       // Buscar si el usuario ya tiene un workspace
-      const members = await base44.entities.WorkspaceMember.filter({ user_id: user.email });
+      const members = await crmClient.entities.WorkspaceMember.filter({ user_id: user.email });
 
       if (members.length > 0) {
         // Tomar el primer workspace (admin preferido)
         const adminMembership = members.find(m => m.role === "admin") || members[0];
-        const workspaces = await base44.entities.Workspace.filter({ id: adminMembership.workspace_id });
+        const workspaces = await crmClient.entities.Workspace.filter({ id: adminMembership.workspace_id });
         if (workspaces.length > 0) {
           setWorkspace(workspaces[0]);
         }
       } else {
         // Crear workspace nuevo para este usuario
-        const newWorkspace = await base44.entities.Workspace.create({
+        const newWorkspace = await crmClient.entities.Workspace.create({
           name: user.full_name ? `Workspace de ${user.full_name}` : "Mi Workspace",
           owner_user_id: user.email
         });
-        await base44.entities.WorkspaceMember.create({
+        await crmClient.entities.WorkspaceMember.create({
           workspace_id: newWorkspace.id,
           user_id: user.email,
           role: "admin"

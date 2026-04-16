@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { base44 } from "@/api/base44Client";
+import { crmClient } from "@/api/crmClient";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { User, Package, DollarSign, Calendar, Plus } from "lucide-react";
@@ -87,7 +87,7 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
 
   const loadContactos = async () => {
     if (!workspace) return;
-    const data = await base44.entities.Contacto.filter({ workspace_id: workspace.id }, "-created_date", 100);
+    const data = await crmClient.entities.Contacto.filter({ workspace_id: workspace.id }, "-created_date", 100);
     setContactos(data);
   };
 
@@ -98,7 +98,7 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
     }
 
     setLoading(true);
-    const created = await base44.entities.Contacto.create({
+    const created = await crmClient.entities.Contacto.create({
       ...newContact,
       numeroTelefono: newContact.whatsapp,
       workspace_id: workspace?.id

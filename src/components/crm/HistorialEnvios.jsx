@@ -1,4 +1,4 @@
-import { base44 } from "@/api/base44Client";
+import { crmClient } from "@/api/crmClient";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,13 +13,13 @@ export default function HistorialEnvios({ contactoId, consultaId }) {
       if (consultaId) {
         query.consultaId = consultaId;
       }
-      return await base44.entities.EnvioWhatsApp.filter(query, "-created_date", 100);
+      return await crmClient.entities.EnvioWhatsApp.filter(query, "-created_date", 100);
     }
   });
 
   const { data: listas = [] } = useQuery({
     queryKey: ['listas-whatsapp-map'],
-    queryFn: () => base44.entities.ListaWhatsApp.list("-updated_date", 1000)
+    queryFn: () => crmClient.entities.ListaWhatsApp.list("-updated_date", 1000)
   });
 
   const getListaNombre = (listaId) => {

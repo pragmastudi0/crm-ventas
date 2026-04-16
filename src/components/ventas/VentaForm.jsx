@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { crmClient } from "@/api/crmClient";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -58,7 +58,7 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
     queryKey: ['proveedores-activos', workspace?.id],
     queryFn: async () => {
       if (!workspace) return [];
-      const all = await base44.entities.Proveedor.filter({ workspace_id: workspace.id });
+      const all = await crmClient.entities.Proveedor.filter({ workspace_id: workspace.id });
       return all.filter(p => p.activo !== false);
     },
     enabled: open && !!workspace
@@ -176,12 +176,12 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
           // No pisar postventa si ya está activa
           ...(ventaExistente.postventaActiva ? {} : postventaFields),
         };
-        await base44.entities.Venta.update(ventaExistente.id, ventaData);
+        await crmClient.entities.Venta.update(ventaExistente.id, ventaData);
         toast.success(finalizar ? "Venta finalizada" : "Venta actualizada");
         onVentaCreada?.();
         onOpenChange(false);
       } else {
-        const ventas = await base44.entities.Venta.list("-created_date", 1);
+        const ventas = await crmClient.entities.Venta.list("-created_date", 1);
         let nuevoCodigo = `V-${new Date().getFullYear()}-000001`;
         if (ventas.length > 0 && ventas[0].codigo) {
           const partes = ventas[0].codigo.split('-');
@@ -217,17 +217,17 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
           ...postventaFields,
         };
 
-        const ventaCreada = await base44.entities.Venta.create(ventaData);
+        const ventaCreada = await crmClient.entities.Venta.create(ventaData);
 
         // Crear contacto automáticamente si se ingresó WhatsApp
         if (formData.whatsappCliente && !formData.contactoId) {
-          const contactoCreado = await base44.entities.Contacto.create({
+          const contactoCreado = await crmClient.entities.Contacto.create({
             nombre: formData.nombreSnapshot,
             whatsapp: formData.whatsappCliente,
             canalOrigen: formData.marketplace || "Otro",
             workspace_id: workspace?.id
           });
-          await base44.entities.Venta.update(ventaCreada.id, { contactoId: contactoCreado.id });
+          await crmClient.entities.Venta.update(ventaCreada.id, { contactoId: contactoCreado.id });
         }
 
         toast.success(finalizar ? "Venta finalizada y postventa activada" : "Borrador guardado");

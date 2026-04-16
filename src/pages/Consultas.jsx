@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { crmClient } from "@/api/crmClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "@/components/hooks/useCurrentUser";
 import { useWorkspace } from "@/components/context/WorkspaceContext";
@@ -56,7 +56,7 @@ export default function Consultas() {
   const { data: consultas = [], refetch, isLoading } = useQuery({
     queryKey: ['consultas-list', workspace?.id],
     queryFn: () => workspace
-      ? base44.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 2000)
+      ? crmClient.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 2000)
       : [],
     enabled: !!workspace
   });
@@ -76,7 +76,7 @@ export default function Consultas() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Consulta.delete(id),
+    mutationFn: (id) => crmClient.entities.Consulta.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultas-list', workspace?.id] });
       toast.success("Consulta eliminada");
@@ -142,7 +142,7 @@ export default function Consultas() {
   };
 
   const handleMarcarConcretado = async (consulta) => {
-    const ventasExistentes = await base44.entities.Venta.filter({ consultaId: consulta.id });
+    const ventasExistentes = await crmClient.entities.Venta.filter({ consultaId: consulta.id });
     if (ventasExistentes.length > 0) {
       const ventaExistente = ventasExistentes[0];
       window.location.href = createPageUrl(`VentaDetalle?id=${ventaExistente.id}`);
