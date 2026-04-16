@@ -54,13 +54,13 @@ async function requireNoError(promise, fallbackMessage) {
 
 export async function fetchUsers() {
   return requireNoError(
-    supabase.from(TABLES.users).select("*").order("created_at", { ascending: false }),
+    supabase.from(TABLES.users).select("*").order("created_date", { ascending: false }),
     "Failed to fetch users"
   );
 }
 
 export async function fetchDeals(workspaceId) {
-  let query = supabase.from(TABLES.deals).select("*").order("created_at", { ascending: false });
+  let query = supabase.from(TABLES.deals).select("*").order("created_date", { ascending: false });
   if (workspaceId) query = query.eq("workspace_id", workspaceId);
   return requireNoError(query, "Failed to fetch deals");
 }
