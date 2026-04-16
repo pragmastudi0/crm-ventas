@@ -16,10 +16,18 @@ const ENTITY_TABLES = {
   WorkspaceMember: `${DATABASE_PREFIX}_workspace_members`
 };
 
+/** Nombres de orden usados en el front → columnas reales en Postgres/Supabase */
+const SORT_COLUMN_ALIASES = {
+  created_date: "created_at",
+  updated_date: "updated_at"
+};
+
 const normalizeSort = (sort) => {
-  if (!sort) return { column: "created_date", ascending: false };
-  if (sort.startsWith("-")) return { column: sort.slice(1), ascending: false };
-  return { column: sort, ascending: true };
+  if (!sort) return { column: "created_at", ascending: false };
+  const descending = sort.startsWith("-");
+  const raw = descending ? sort.slice(1) : sort;
+  const column = SORT_COLUMN_ALIASES[raw] ?? raw;
+  return { column, ascending: !descending };
 };
 
 const applyFilters = (query, filter = {}) => {
@@ -36,7 +44,7 @@ const createEntityApi = (entityName) => {
   if (!tableName) throw new Error(`Missing table mapping for entity ${entityName}`);
 
   return {
-    async filter(filter = {}, sort = "-created_date", limit = 1000) {
+    async filter(filter = {}, sort = "-created_at", limit = 1000) {
       const { column, ascending } = normalizeSort(sort);
       let query = supabase.from(tableName).select("*").limit(limit);
       query = applyFilters(query, filter);
@@ -44,29 +52,7 @@ const createEntityApi = (entityName) => {
       if (error) throw error;
       return data || [];
     },
-    /**
-     * Recorre todas las páginas (PostgREST suele limitar ~1000 filas por request).
-     */
-    async filterFetchAll(filter = {}, sort = "-created_date", chunkSize = 1000) {
-      const { column, ascending } = normalizeSort(sort);
-      const all = [];
-      let from = 0;
-      for (;;) {
-        let query = supabase
-          .from(tableName)
-          .select("*")
-          .range(from, from + chunkSize - 1);
-        query = applyFilters(query, filter);
-        const { data, error } = await query.order(column, { ascending });
-        if (error) throw error;
-        const rows = data || [];
-        all.push(...rows);
-        if (rows.length < chunkSize) break;
-        from += chunkSize;
-      }
-      return all;
-    },
-    async list(sort = "-created_date", limit = 1000) {
+    async list(sort = "-created_at", limit = 1000) {
       const { column, ascending } = normalizeSort(sort);
       const { data, error } = await supabase
         .from(tableName)
