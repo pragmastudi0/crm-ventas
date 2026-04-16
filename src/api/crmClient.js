@@ -36,7 +36,7 @@ const createEntityApi = (entityName) => {
   if (!tableName) throw new Error(`Missing table mapping for entity ${entityName}`);
 
   return {
-    async filter(filter = {}, sort = "-created_date", limit = 1000) {
+    async filter(filter = {}, sort = "-created_at", limit = 1000) {
       const { column, ascending } = normalizeSort(sort);
       let query = supabase.from(tableName).select("*").limit(limit);
       query = applyFilters(query, filter);
@@ -44,7 +44,29 @@ const createEntityApi = (entityName) => {
       if (error) throw error;
       return data || [];
     },
-    async list(sort = "-created_date", limit = 1000) {
+    /**
+     * Recorre todas las páginas (PostgREST suele limitar ~1000 filas por request).
+     */
+    async filterFetchAll(filter = {}, sort = "-created_at", chunkSize = 1000) {
+      const { column, ascending } = normalizeSort(sort);
+      const all = [];
+      let from = 0;
+      for (;;) {
+        let query = supabase
+          .from(tableName)
+          .select("*")
+          .range(from, from + chunkSize - 1);
+        query = applyFilters(query, filter);
+        const { data, error } = await query.order(column, { ascending });
+        if (error) throw error;
+        const rows = data || [];
+        all.push(...rows);
+        if (rows.length < chunkSize) break;
+        from += chunkSize;
+      }
+      return all;
+    },
+    async list(sort = "-created_at", limit = 1000) {
       const { column, ascending } = normalizeSort(sort);
       const { data, error } = await supabase
         .from(tableName)
