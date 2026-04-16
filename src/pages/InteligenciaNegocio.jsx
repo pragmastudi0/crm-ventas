@@ -87,6 +87,39 @@ function ManualToggleRow({ label, subAuto, subManual, active, onToggle, children
 
 function ActividadContacto({ workspace }) {
   const [rango, setRango] = useState(7);
+  const { data: envios = [] } = useQuery({
+    queryKey: ["ib-actividad-envios", workspace?.id],
+    queryFn: () =>
+      workspace
+        ? crmClient.entities.EnvioWhatsApp.filter({ workspace_id: workspace.id }, "-created_date", 2000)
+        : [],
+    enabled: !!workspace
+  });
+  const { data: mensajes = [] } = useQuery({
+    queryKey: ["ib-actividad-mensajes", workspace?.id],
+    queryFn: () =>
+      workspace
+        ? crmClient.entities.Mensaje.filter({ workspace_id: workspace.id }, "-created_date", 2000)
+        : [],
+    enabled: !!workspace
+  });
+
+  const todosLosContactos = [
+    ...envios.map((e) => ({
+      fecha: e.created_date,
+      consultaId: e.consultaId,
+      nombre: e.contactoNombre || e.contactoId || "Contacto",
+      tipo: "whatsapp"
+    })),
+    ...mensajes.map((m) => ({
+      fecha: m.created_date,
+      consultaId: m.consultaId,
+      nombre: m.contactoNombre || m.contactoId || "Contacto",
+      tipo: "seguimiento"
+    }))
+  ].filter((item) => item.fecha);
+
+  const contactosHoy = todosLosContactos.filter((c) => moment(c.fecha).isSame(moment(), "day"));
 
   // ── Días agrupados por día según rango ──
   const ultimos7 = Array.from({ length: rango }, (_, i) => {
@@ -96,6 +129,7 @@ function ActividadContacto({ workspace }) {
     ).length;
     return { label: dia.format(rango === 7 ? "ddd DD" : "DD/MM"), count, isHoy: i === rango - 1 };
   });
+  const maxDia = Math.max(...ultimos7.map((d) => d.count), 0);
   const promedio7 = (ultimos7.reduce((s, d) => s + d.count, 0) / rango).toFixed(1);
 
   // ── Recontactos por consulta (consultas con más de 1 contacto) ──
