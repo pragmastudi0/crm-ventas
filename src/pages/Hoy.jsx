@@ -12,6 +12,7 @@ import { createPageUrl } from "@/utils";
 import moment from "moment";
 import WhatsAppSender from "@/components/crm/WhatsAppSender";
 import { toast } from "sonner";
+import { updateDeal, isConsultaSeguimientoInactive } from "@/api/crmApi";
 
 const etapaColors = {
   Nuevo: "bg-blue-100 text-blue-700",
@@ -35,7 +36,10 @@ export default function Hoy() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => crmClient.entities.Consulta.update(id, data),
+    mutationFn: ({ id, data }) => {
+      if (!workspace?.id) throw new Error("workspace_id is required");
+      return updateDeal(workspace.id, id, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultas-hoy'] });
       toast.success("Actualizado");
@@ -44,33 +48,29 @@ export default function Hoy() {
 
   const today = moment();
 
-  // Helper: devuelve la fecha de seguimiento correcta según etapa
-  const getFechaSeguimiento = (c) =>
-    c.etapa === "Concretado"
-      ? (c.fecha_seguimiento_posventa || c.proximoSeguimiento)
-      : c.proximoSeguimiento;
+  const seguimientoActivo = (c) => {
+    if (isConsultaSeguimientoInactive(c)) return false;
+    const fecha = c.proximoSeguimiento;
+    if (!fecha || !moment(fecha).isValid()) return false;
+    return true;
+  };
 
-  const hoy = consultas.filter(c => {
-    const fecha = getFechaSeguimiento(c);
-    if (!fecha) return false;
-    if (c.etapa === "Perdido") return false;
-    return moment(fecha).isSame(today, 'day');
+  const hoy = consultas.filter((c) => {
+    if (!seguimientoActivo(c)) return false;
+    return moment(c.proximoSeguimiento).isSame(today, "day");
   });
 
-  const vencidos = consultas.filter(c => {
-    const fecha = getFechaSeguimiento(c);
-    if (!fecha) return false;
-    if (c.etapa === "Perdido") return false;
-    return moment(fecha).isBefore(today, 'day');
+  const vencidos = consultas.filter((c) => {
+    if (!seguimientoActivo(c)) return false;
+    return moment(c.proximoSeguimiento).isBefore(today, "day");
   });
 
-  const proximos3d = consultas.filter(c => {
-    const fecha = getFechaSeguimiento(c);
-    if (!fecha) return false;
-    if (c.etapa === "Perdido") return false;
+  const proximos3d = consultas.filter((c) => {
+    if (!seguimientoActivo(c)) return false;
+    const fecha = c.proximoSeguimiento;
     return (
-      moment(fecha).isAfter(today, 'day') &&
-      moment(fecha).isBefore(today.clone().add(3, 'days'), 'day')
+      moment(fecha).isAfter(today, "day") &&
+      moment(fecha).isBefore(today.clone().add(3, "days"), "day")
     );
   });
 
@@ -80,26 +80,17 @@ export default function Hoy() {
   };
 
   const handleMarcarCompletado = async (consulta) => {
-    if (consulta.etapa === "Concretado") {
-      // Finalizar posventa: limpiar fecha para que no vuelva a aparecer
-      await updateMutation.mutateAsync({
-        id: consulta.id,
-        data: { fecha_seguimiento_posventa: null }
-      });
-    } else {
-      const nuevaFecha = moment().add(3, 'days').format("YYYY-MM-DD");
-      await updateMutation.mutateAsync({
-        id: consulta.id,
-        data: { proximoSeguimiento: nuevaFecha }
-      });
-    }
+    const nuevaFecha = moment().add(3, "days").format("YYYY-MM-DD");
+    await updateMutation.mutateAsync({
+      id: consulta.id,
+      data: { proximoSeguimiento: nuevaFecha },
+    });
   };
 
   const ConsultaItem = ({ consulta, tipo }) => {
-    const esPosventa = consulta.etapa === "Concretado";
-    const fechaMostrar = esPosventa ? consulta.fecha_seguimiento_posventa : consulta.proximoSeguimiento;
+    const fechaMostrar = consulta.proximoSeguimiento;
     return (
-    <Card className={`hover:shadow-md transition-all ${esPosventa ? "border-emerald-200 bg-emerald-50/30" : ""}`}>
+    <Card className="hover:shadow-md transition-all">
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -108,9 +99,6 @@ export default function Hoy() {
               <Badge className={etapaColors[consulta.etapa] || "bg-slate-100 text-slate-700"}>
                 {consulta.etapa}
               </Badge>
-              {esPosventa && (
-                <Badge className="bg-emerald-600 text-white text-xs">Posventa</Badge>
-              )}
             </div>
             <p className="text-sm text-slate-600 mb-1">{consulta.productoConsultado}</p>
             {consulta.variante && (
@@ -126,7 +114,9 @@ export default function Hoy() {
               <span className={`text-xs ${
                 tipo === "vencido" ? "text-red-600 font-medium" : "text-slate-500"
               }`}>
-                {moment(fechaMostrar).format("DD/MM/YYYY")}
+                {fechaMostrar && moment(fechaMostrar).isValid()
+                  ? moment(fechaMostrar).format("DD/MM/YYYY")
+                  : "—"}
                 {tipo === "vencido" && " (vencido)"}
               </span>
             </div>

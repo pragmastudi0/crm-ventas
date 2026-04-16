@@ -44,6 +44,28 @@ const createEntityApi = (entityName) => {
       if (error) throw error;
       return data || [];
     },
+    /**
+     * Recorre todas las páginas (PostgREST suele limitar ~1000 filas por request).
+     */
+    async filterFetchAll(filter = {}, sort = "-created_date", chunkSize = 1000) {
+      const { column, ascending } = normalizeSort(sort);
+      const all = [];
+      let from = 0;
+      for (;;) {
+        let query = supabase
+          .from(tableName)
+          .select("*")
+          .range(from, from + chunkSize - 1);
+        query = applyFilters(query, filter);
+        const { data, error } = await query.order(column, { ascending });
+        if (error) throw error;
+        const rows = data || [];
+        all.push(...rows);
+        if (rows.length < chunkSize) break;
+        from += chunkSize;
+      }
+      return all;
+    },
     async list(sort = "-created_date", limit = 1000) {
       const { column, ascending } = normalizeSort(sort);
       const { data, error } = await supabase
