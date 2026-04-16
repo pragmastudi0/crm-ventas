@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Copy, ExternalLink, Check, Sparkles } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { crmClient } from "@/api/crmClient";
 import { toast } from "sonner";
 
 export default function PostventaWhatsAppSender({ open, onOpenChange, venta, contactoWhatsapp, onMessageSent, workspaceId }) {
@@ -30,11 +30,11 @@ export default function PostventaWhatsAppSender({ open, onOpenChange, venta, con
   const loadData = async () => {
     const [allPlantillas, vars] = await Promise.all([
       workspaceId
-        ? base44.entities.PlantillaWhatsApp.filter({ activa: true, workspace_id: workspaceId })
-        : base44.entities.PlantillaWhatsApp.filter({ activa: true }),
+        ? crmClient.entities.PlantillaWhatsApp.filter({ activa: true, workspace_id: workspaceId })
+        : crmClient.entities.PlantillaWhatsApp.filter({ activa: true }),
       workspaceId
-        ? base44.entities.VariablePlantilla.filter({ workspace_id: workspaceId })
-        : base44.entities.VariablePlantilla.list()
+        ? crmClient.entities.VariablePlantilla.filter({ workspace_id: workspaceId })
+        : crmClient.entities.VariablePlantilla.list()
     ]);
     setVariablesDB(vars);
     const postventa = allPlantillas.filter(p => p.etapa === 'Concretado');
@@ -84,7 +84,7 @@ export default function PostventaWhatsAppSender({ open, onOpenChange, venta, con
   // UN SOLO PASO: marcar como enviado = cerrar postventa
   const handleMarkSent = async () => {
     setLoading(true);
-    await base44.entities.Venta.update(venta.id, {
+    await crmClient.entities.Venta.update(venta.id, {
       postventaUltimoContacto: new Date().toISOString(),
       postventaEstado: "Cerrado",
       postventaActiva: false,

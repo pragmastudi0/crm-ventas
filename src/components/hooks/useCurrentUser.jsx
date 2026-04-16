@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabaseClient";
 
 export function useCurrentUser() {
   return useQuery({
     queryKey: ['current-user'],
     queryFn: async () => {
       try {
-        const user = await base44.auth.me();
-        return user;
+        const { data, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        return data?.user ?? null;
       } catch (error) {
         return null;
       }

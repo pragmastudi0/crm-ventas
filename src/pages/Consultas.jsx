@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { crmClient } from "@/api/crmClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "@/components/hooks/useCurrentUser";
 import { useWorkspace } from "@/components/context/WorkspaceContext";
@@ -23,6 +23,7 @@ import DetalleConsultaDialog from "@/components/crm/DetalleConsultaDialog";
 import DialogSelectorListasWhatsApp from "@/components/crm/DialogSelectorListasWhatsApp";
 import VentaForm from "@/components/ventas/VentaForm";
 import { toast } from "sonner";
+import { fetchPipelineStages, updateDeal } from "@/api/crmApi";
 
 const CANALES = ["Instagram", "WhatsApp", "MercadoLibre", "Referido", "Local", "Otro"];
 
@@ -55,7 +56,7 @@ export default function Consultas() {
   const { data: consultas = [], refetch, isLoading } = useQuery({
     queryKey: ['consultas-list', workspace?.id],
     queryFn: () => workspace
-      ? base44.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 2000)
+      ? crmClient.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 2000)
       : [],
     enabled: !!workspace
   });
@@ -63,23 +64,19 @@ export default function Consultas() {
   // Cargar etapas activas del pipeline dinámicamente
   const { data: etapasActivas = [] } = useQuery({
     queryKey: ['pipeline-stages', workspace?.id],
-    queryFn: async () => {
-      if (!workspace) return [];
-      const stages = await base44.entities.PipelineStage.filter({ workspace_id: workspace.id }, "orden", 100);
-      return stages.filter(s => s.activa !== false);
-    },
+    queryFn: () => (workspace ? fetchPipelineStages(workspace.id) : []),
     enabled: !!workspace
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Consulta.update(id, data),
+    mutationFn: ({ id, data }) => updateDeal(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultas-list', workspace?.id] });
     }
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Consulta.delete(id),
+    mutationFn: (id) => crmClient.entities.Consulta.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultas-list', workspace?.id] });
       toast.success("Consulta eliminada");
@@ -88,7 +85,7 @@ export default function Consultas() {
 
   // Colores dinámicos por etapa
   const getEtapaColor = (etapaNombre) => {
-    const etapa = etapasActivas.find(e => e.nombre === etapaNombre);
+    const etapa = etapasActivas.find((e) => (e.name ?? e.nombre) === etapaNombre);
     const colorMap = {
       "bg-blue-500": "bg-blue-100 text-blue-700",
       "bg-cyan-500": "bg-cyan-100 text-cyan-700",
@@ -145,7 +142,7 @@ export default function Consultas() {
   };
 
   const handleMarcarConcretado = async (consulta) => {
-    const ventasExistentes = await base44.entities.Venta.filter({ consultaId: consulta.id });
+    const ventasExistentes = await crmClient.entities.Venta.filter({ consultaId: consulta.id });
     if (ventasExistentes.length > 0) {
       const ventaExistente = ventasExistentes[0];
       window.location.href = createPageUrl(`VentaDetalle?id=${ventaExistente.id}`);
@@ -158,7 +155,7 @@ export default function Consultas() {
   const handleMarcarPerdido = async (consulta, motivo) => {
     await updateMutation.mutateAsync({
       id: consulta.id,
-      data: { etapa: "Perdido", motivoPerdida: motivo }
+      data: { etapa: "Perdido", motivoPerdida: motivo, stage_id: null }
     });
     toast.success("Marcado como perdido");
   };
@@ -226,13 +223,16 @@ export default function Consultas() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todas">Todas las etapas</SelectItem>
-                {etapasActivas.map(etapa => (
-                  <SelectItem key={etapa.nombre} value={etapa.nombre}>
-                    {etapa.nombre}
-                  </SelectItem>
-                ))}
+                {etapasActivas.map(etapa => {
+                  const name = etapa.name ?? etapa.nombre;
+                  return (
+                    <SelectItem key={etapa.id || name} value={name}>
+                      {name}
+                    </SelectItem>
+                  );
+                })}
                 {/* Siempre incluir Perdido como opción especial */}
-                {!etapasActivas.find(e => e.nombre === "Perdido") && (
+                {!etapasActivas.find(e => (e.name ?? e.nombre) === "Perdido") && (
                   <SelectItem value="Perdido">Perdido</SelectItem>
                 )}
               </SelectContent>
@@ -504,7 +504,7 @@ export default function Consultas() {
         onVentaCreada={async () => {
           await updateMutation.mutateAsync({
             id: consultaParaVenta.id,
-            data: { concretado: true, etapa: "Concretado" }
+            data: { concretado: true, etapa: "Concretado", stage_id: null }
           });
           setShowVentaForm(false);
           setConsultaParaVenta(null);

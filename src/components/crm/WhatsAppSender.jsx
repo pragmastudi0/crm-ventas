@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Copy, ExternalLink, Check, Sparkles } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { crmClient } from "@/api/crmClient";
 import { toast } from "sonner";
 
 // FIX: reemplazamos el import de date-fns por una implementación local
@@ -43,8 +43,8 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
   }, [selectedPlantilla, consulta]);
 
   const loadPlantillas = async () => {
-    const user = await base44.auth.me();
-    const data = await base44.entities.PlantillaWhatsApp.filter({ activa: true, workspace_id: consulta?.workspace_id, created_by: user?.email });
+    const user = await crmClient.auth.me();
+    const data = await crmClient.entities.PlantillaWhatsApp.filter({ activa: true, workspace_id: consulta?.workspace_id, created_by: user?.email });
     setPlantillas(data);
 
     const etapaMapeada = mapEtapaToPlantilla(consulta?.etapa);
@@ -113,7 +113,7 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
     window.open(url.toString(), "_blank", "noopener,noreferrer");
 
     try {
-      await base44.entities.EnvioWhatsApp.create({
+      await crmClient.entities.EnvioWhatsApp.create({
         workspace_id: consulta.workspace_id,
         contactoId: consulta.contactoId,
         consultaId: consulta.id,
@@ -128,7 +128,7 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
   const handleMarkSent = async () => {
     setLoading(true);
 
-    await base44.entities.Mensaje.create({
+    await crmClient.entities.Mensaje.create({
       workspace_id: consulta.workspace_id,
       consultaId: consulta.id,
       plantillaId: selectedPlantilla?.id,
@@ -152,7 +152,7 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
       updates.etapa = "Seguimiento";
     }
 
-    await base44.entities.Consulta.update(consulta.id, updates);
+    await crmClient.entities.Consulta.update(consulta.id, updates);
 
     toast.success("Mensaje registrado correctamente");
     setLoading(false);

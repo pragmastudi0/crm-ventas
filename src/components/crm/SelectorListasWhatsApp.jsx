@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { crmClient } from "@/api/crmClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,7 @@ export default function SelectorListasWhatsApp({ contactoId, contactoWhatsapp, c
   const { data: listas = [] } = useQuery({
     queryKey: ['listas-publicadas'],
     queryFn: async () => {
-      const allListas = await base44.entities.ListaWhatsApp.list("-updated_date", 1000);
+      const allListas = await crmClient.entities.ListaWhatsApp.list("-updated_date", 1000);
       return allListas.filter(l => l.estado === "Publicada");
     }
   });
@@ -35,7 +35,7 @@ export default function SelectorListasWhatsApp({ contactoId, contactoWhatsapp, c
   const registrarEnvioMutation = useMutation({
     mutationFn: async (accion) => {
       // Crear log de envío
-      await base44.entities.EnvioWhatsApp.create({
+      await crmClient.entities.EnvioWhatsApp.create({
         contactoId,
         consultaId: consultaId || null,
         listaId: selectedListaId,
@@ -45,9 +45,9 @@ export default function SelectorListasWhatsApp({ contactoId, contactoWhatsapp, c
 
       // Actualizar ultimoContacto en Consulta si existe
       if (consultaId) {
-        const consultas = await base44.entities.Consulta.filter({ id: consultaId });
+        const consultas = await crmClient.entities.Consulta.filter({ id: consultaId });
         if (consultas.length > 0) {
-          await base44.entities.Consulta.update(consultaId, {
+          await crmClient.entities.Consulta.update(consultaId, {
             ultimoContacto: new Date().toISOString()
           });
         }

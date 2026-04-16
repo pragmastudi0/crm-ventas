@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { crmClient } from "@/api/crmClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "@/components/hooks/useCurrentUser";
 import { useWorkspace } from "@/components/context/WorkspaceContext";
@@ -46,18 +46,18 @@ export default function Contactos() {
 
   const { data: contactos = [], refetch } = useQuery({
     queryKey: ['contactos', workspace?.id],
-    queryFn: () => workspace ? base44.entities.Contacto.filter({ workspace_id: workspace.id }, "-created_date", 500) : [],
+    queryFn: () => workspace ? crmClient.entities.Contacto.filter({ workspace_id: workspace.id }, "-created_date", 500) : [],
     enabled: !!workspace
   });
 
   const { data: consultas = [] } = useQuery({
     queryKey: ['consultas-contactos', workspace?.id],
-    queryFn: () => workspace ? base44.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 1000) : [],
+    queryFn: () => workspace ? crmClient.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 1000) : [],
     enabled: !!workspace
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Contacto.create({ ...data, workspace_id: workspace?.id }),
+    mutationFn: (data) => crmClient.entities.Contacto.create({ ...data, workspace_id: workspace?.id }),
     onSuccess: () => {
        queryClient.invalidateQueries({ queryKey: ['contactos', workspace?.id] });
        toast.success("Contacto creado");
@@ -66,7 +66,7 @@ export default function Contactos() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Contacto.update(id, data),
+    mutationFn: ({ id, data }) => crmClient.entities.Contacto.update(id, data),
     onSuccess: () => {
        queryClient.invalidateQueries({ queryKey: ['contactos', workspace?.id] });
        toast.success("Contacto actualizado");
@@ -75,7 +75,7 @@ export default function Contactos() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Contacto.delete(id),
+    mutationFn: (id) => crmClient.entities.Contacto.delete(id),
     onSuccess: () => {
        queryClient.invalidateQueries({ queryKey: ['contactos', workspace?.id] });
        toast.success("Contacto eliminado");
