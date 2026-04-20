@@ -23,6 +23,15 @@ const etapaColors = {
   Concretado: "bg-emerald-100 text-emerald-700",
 };
 
+const canalColors = {
+  WhatsApp: "bg-emerald-100 text-emerald-700",
+  Instagram: "bg-pink-100 text-pink-700",
+  MercadoLibre: "bg-yellow-100 text-yellow-700",
+  Referido: "bg-violet-100 text-violet-700",
+  Local: "bg-slate-200 text-slate-700",
+  Otro: "bg-indigo-100 text-indigo-700",
+};
+
 export default function Hoy() {
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [selectedConsulta, setSelectedConsulta] = useState(null);
@@ -98,6 +107,9 @@ export default function Hoy() {
               <h3 className="font-semibold text-slate-900">{consulta.contactoNombre}</h3>
               <Badge className={etapaColors[consulta.etapa] || "bg-slate-100 text-slate-700"}>
                 {consulta.etapa}
+              </Badge>
+              <Badge className={canalColors[consulta.canalOrigen] || "bg-slate-100 text-slate-700"}>
+                {consulta.canalOrigen || "Sin canal"}
               </Badge>
             </div>
             <p className="text-sm text-slate-600 mb-1">{consulta.productoConsultado}</p>
