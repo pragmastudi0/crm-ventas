@@ -26,6 +26,17 @@ import { toast } from "sonner";
 import { fetchPipelineStages, updateDeal } from "@/api/crmApi";
 
 const CANALES = ["Instagram", "WhatsApp", "MercadoLibre", "Referido", "Local", "Otro"];
+const normalizeChannel = (value) => {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "Sin especificar";
+  if (raw.includes("instagram")) return "Instagram";
+  if (raw.includes("whatsapp")) return "WhatsApp";
+  if (raw.includes("mercadolibre") || raw.includes("mercado libre")) return "MercadoLibre";
+  if (raw.includes("referido")) return "Referido";
+  if (raw.includes("local")) return "Local";
+  if (raw.includes("otro")) return "Otro";
+  return "Sin especificar";
+};
 
 const prioridadColors = {
   Alta: "bg-red-50 text-red-700 border-red-200",
@@ -60,6 +71,13 @@ export default function Consultas() {
       : [],
     enabled: !!workspace
   });
+  const { data: contactos = [] } = useQuery({
+    queryKey: ['contactos-consultas', workspace?.id],
+    queryFn: () => workspace
+      ? crmClient.entities.Contacto.filter({ workspace_id: workspace.id }, "-created_date", 2000)
+      : [],
+    enabled: !!workspace
+  });
 
   // Cargar etapas activas del pipeline dinámicamente
   const { data: etapasActivas = [] } = useQuery({
@@ -80,6 +98,10 @@ export default function Consultas() {
     }
     return out;
   }, [etapasActivas]);
+  const contactoById = useMemo(
+    () => new Map(contactos.map((contacto) => [contacto.id, contacto])),
+    [contactos],
+  );
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => updateDeal(id, data),
@@ -127,7 +149,10 @@ export default function Consultas() {
         }
       }
       if (filtroEtapa !== "todas" && c.etapa !== filtroEtapa) return false;
-      if (filtroCanal !== "todos" && c.canalOrigen !== filtroCanal) return false;
+      const canalResolved = normalizeChannel(
+        c.canalOrigen || contactoById.get(c.contactoId)?.canalOrigen,
+      );
+      if (filtroCanal !== "todos" && canalResolved !== normalizeChannel(filtroCanal)) return false;
       if (filtroPrioridad !== "todas" && c.prioridad !== filtroPrioridad) return false;
       return true;
     })
@@ -308,6 +333,9 @@ export default function Consultas() {
                 consultasFiltradas.map(consulta => {
                   const seguimientoVencido = consulta.proximoSeguimiento &&
                     moment(consulta.proximoSeguimiento).isBefore(moment(), 'day');
+                  const canalResolved = normalizeChannel(
+                    consulta.canalOrigen || contactoById.get(consulta.contactoId)?.canalOrigen,
+                  );
 
                   return (
                     <TableRow
@@ -323,9 +351,9 @@ export default function Consultas() {
                           <p className="font-medium text-slate-900">{consulta.contactoNombre}</p>
                           <p className="text-sm text-slate-500">{consulta.contactoWhatsapp}</p>
                           <div className="flex gap-1 mt-1">
-                            {consulta.canalOrigen && (
+                            {canalResolved !== "Sin especificar" && (
                               <Badge variant="secondary" className="text-xs">
-                                {consulta.canalOrigen}
+                                {canalResolved}
                               </Badge>
                             )}
                             <Badge variant="outline" className={cn("text-xs", prioridadColors[consulta.prioridad] ?? prioridadColors.Media)}>
