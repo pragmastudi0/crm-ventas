@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Copy, ExternalLink, Check, Sparkles } from "lucide-react";
 import { crmClient } from "@/api/crmClient";
-import { updateDeal, applyClosedConsultaFollowupFields } from "@/api/crmApi";
+import { fetchPipelineStages, updateDeal, applyClosedConsultaFollowupFields } from "@/api/crmApi";
 import { toast } from "sonner";
 
 // FIX: reemplazamos el import de date-fns por una implementación local
@@ -21,6 +21,12 @@ function addBusinessDays(date, days) {
     if (d !== 0 && d !== 6) added++;
   }
   return result.toISOString().split("T")[0]; // Devuelve string, no Date
+}
+
+function getFirstName(fullName) {
+  const normalized = String(fullName || "").trim();
+  if (!normalized) return "Cliente";
+  return normalized.split(/\s+/)[0];
 }
 
 export default function WhatsAppSender({ open, onOpenChange, consulta, onMessageSent }) {
@@ -76,7 +82,7 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
   const reemplazarVariables = (texto, data) => {
     if (!texto) return "";
     return texto
-      .replace(/{NOMBRE}/g, data.contactoNombre || "")
+      .replace(/{NOMBRE}/g, getFirstName(data.contactoNombre))
       .replace(/{PRODUCTO}/g, data.productoConsultado || "")
       .replace(/{VARIANTE}/g, data.variante || "")
       .replace(/{PRECIO}/g, data.precioCotizado?.toLocaleString() || "")
@@ -153,6 +159,14 @@ export default function WhatsAppSender({ open, onOpenChange, consulta, onMessage
 
     if (consulta.etapa === "Nuevo") {
       updates.etapa = "Seguimiento";
+      if (consulta.workspace_id) {
+        const stages = await fetchPipelineStages(consulta.workspace_id);
+        const seguimientoStage = stages.find((stage) => {
+          const stageName = (stage.name ?? stage.nombre ?? "").toLowerCase();
+          return stageName === "seguimiento" || stageName.startsWith("seguimiento");
+        });
+        updates.stage_id = seguimientoStage?.id ?? null;
+      }
     }
 
     if (consulta.workspace_id) {
