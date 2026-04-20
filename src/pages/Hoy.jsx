@@ -43,6 +43,13 @@ export default function Hoy() {
     queryFn: () => workspace ? crmClient.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 1000) : [],
     enabled: !!workspace
   });
+  const { data: contactos = [] } = useQuery({
+    queryKey: ['contactos-hoy', workspace?.id],
+    queryFn: () => workspace ? crmClient.entities.Contacto.filter({ workspace_id: workspace.id }, "-created_date", 1000) : [],
+    enabled: !!workspace
+  });
+
+  const contactoById = new Map(contactos.map((contacto) => [contacto.id, contacto]));
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => {
@@ -98,6 +105,7 @@ export default function Hoy() {
 
   const ConsultaItem = ({ consulta, tipo }) => {
     const fechaMostrar = consulta.proximoSeguimiento;
+    const canalOrigen = consulta.canalOrigen || contactoById.get(consulta.contactoId)?.canalOrigen || "Sin canal";
     return (
     <Card className="hover:shadow-md transition-all">
       <CardContent className="p-4">
@@ -108,8 +116,8 @@ export default function Hoy() {
               <Badge className={etapaColors[consulta.etapa] || "bg-slate-100 text-slate-700"}>
                 {consulta.etapa}
               </Badge>
-              <Badge className={canalColors[consulta.canalOrigen] || "bg-slate-100 text-slate-700"}>
-                {consulta.canalOrigen || "Sin canal"}
+              <Badge className={canalColors[canalOrigen] || "bg-slate-100 text-slate-700"}>
+                {canalOrigen}
               </Badge>
             </div>
             <p className="text-sm text-slate-600 mb-1">{consulta.productoConsultado}</p>
