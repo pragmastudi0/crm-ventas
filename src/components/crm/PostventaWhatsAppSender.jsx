@@ -9,6 +9,12 @@ import { MessageCircle, Copy, ExternalLink, Check, Sparkles } from "lucide-react
 import { crmClient } from "@/api/crmClient";
 import { toast } from "sonner";
 
+function getFirstName(fullName) {
+  const normalized = String(fullName || "").trim();
+  if (!normalized) return "Cliente";
+  return normalized.split(/\s+/)[0];
+}
+
 export default function PostventaWhatsAppSender({ open, onOpenChange, venta, contactoWhatsapp, onMessageSent, workspaceId }) {
   const [plantillas, setPlantillas] = useState([]);
   const [variablesDB, setVariablesDB] = useState([]);
@@ -50,7 +56,7 @@ export default function PostventaWhatsAppSender({ open, onOpenChange, venta, con
       result = result.replace(new RegExp(`\\{${v.clave}\\}`, 'g'), v.valor);
     });
     return result
-      .replace(/{NOMBRE}/g, data.nombreSnapshot || "")
+      .replace(/{NOMBRE}/g, getFirstName(data.nombreSnapshot))
       .replace(/{PRODUCTO}/g, data.productoSnapshot || data.modelo || "")
       .replace(/{GARANTIA}/g, "6 meses")
       .replace(/{SOPORTE}/g, "WhatsApp o Instagram")

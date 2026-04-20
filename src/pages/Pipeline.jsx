@@ -111,11 +111,23 @@ export default function Pipeline() {
     return true;
   });
 
+  const consultasUnicas = Array.from(
+    new Map(consultasFiltradas.map((consulta) => [consulta.id, consulta])).values(),
+  );
+
+  const belongsToStage = (consulta, etapa) => {
+    if (consulta.stage_id) {
+      return consulta.stage_id === etapa.id;
+    }
+    const stageName = etapa.name ?? etapa.nombre;
+    return consulta.etapa === stageName;
+  };
+
   // Agrupar por etapa
   const consultasPorEtapa = etapas.reduce((acc, etapa) => {
     const stageName = etapa.name ?? etapa.nombre;
     const key = etapa.id || stageName;
-    acc[key] = consultasFiltradas.filter((c) => c.stage_id === etapa.id || c.etapa === stageName);
+    acc[key] = consultasUnicas.filter((consulta) => belongsToStage(consulta, etapa));
     return acc;
   }, {});
 
