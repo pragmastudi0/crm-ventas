@@ -10,6 +10,17 @@ import moment from "moment";
 function pct(n, d) { return d > 0 ? ((n / d) * 100).toFixed(1) : "0.0"; }
 function usd(n) { return `US$ ${(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`; }
 function daysLeftInMonth() { const now = moment(); return now.daysInMonth() - now.date(); }
+function normalizeChannel(channelValue) {
+  const raw = String(channelValue || "").trim().toLowerCase();
+  if (!raw) return "Sin especificar";
+  if (raw.includes("whatsapp")) return "WhatsApp";
+  if (raw.includes("instagram")) return "Instagram";
+  if (raw.includes("mercadolibre") || raw.includes("mercado libre")) return "MercadoLibre";
+  if (raw.includes("referido")) return "Referido";
+  if (raw.includes("local")) return "Local";
+  if (raw.includes("otro")) return "Otro";
+  return "Sin especificar";
+}
 function deriveSaleStatus(consulta) {
   if (!consulta) return "Pendiente";
   const etapa = String(consulta.etapa || "").toLowerCase();
@@ -492,20 +503,22 @@ export default function InteligenciaNegocio() {
     .sort((a, b) => b.ganancia - a.ganancia);
   const maxProv = topProveedores[0]?.ganancia || 1;
 
+  const consultaById = new Map(consultas30.map((consulta) => [consulta.id, consulta]));
   const canalMap = {};
-  consultas30.forEach(c => {
-    const k = c.canalOrigen || "Sin especificar";
-    if (!canalMap[k]) canalMap[k] = { consultas: 0, concretados: 0, ganancia: 0 };
-    canalMap[k].consultas++;
-    if (c.etapa === "Concretado") canalMap[k].concretados++;
+  consultas30.forEach((consulta) => {
+    const channel = normalizeChannel(consulta.canalOrigen);
+    if (!canalMap[channel]) canalMap[channel] = { consultas: 0, ventas: 0, ganancia: 0 };
+    canalMap[channel].consultas++;
   });
-  ventas30.forEach(v => {
-    const k = v.marketplace || "Sin especificar";
-    if (!canalMap[k]) canalMap[k] = { consultas: 0, concretados: 0, ganancia: 0 };
-    canalMap[k].ganancia += v.ganancia || 0;
+  ventas30.forEach((venta) => {
+    const consultaCanal = consultaById.get(venta.consultaId)?.canalOrigen;
+    const channel = normalizeChannel(consultaCanal || venta.marketplace);
+    if (!canalMap[channel]) canalMap[channel] = { consultas: 0, ventas: 0, ganancia: 0 };
+    canalMap[channel].ventas++;
+    canalMap[channel].ganancia += venta.ganancia || 0;
   });
   const canales = Object.entries(canalMap)
-    .map(([name, d]) => ({ name, ventas: d.concretados, conversion: pct(d.concretados, d.consultas), ganancia: d.ganancia }))
+    .map(([name, d]) => ({ name, ventas: d.ventas, conversion: pct(d.ventas, d.consultas), ganancia: d.ganancia }))
     .sort((a, b) => b.ganancia - a.ganancia);
   const maxCanal = canales[0]?.ganancia || 1;
 
