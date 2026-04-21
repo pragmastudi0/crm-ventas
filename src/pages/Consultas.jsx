@@ -104,7 +104,10 @@ export default function Consultas() {
   );
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => updateDeal(id, data),
+    mutationFn: ({ id, data }) => {
+      if (!workspace?.id) throw new Error("workspace_id is required");
+      return updateDeal(workspace.id, id, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultas-list', workspace?.id] });
     }
@@ -191,11 +194,15 @@ export default function Consultas() {
   };
 
   const handleMarcarPerdido = async (consulta, motivo) => {
-    await updateMutation.mutateAsync({
-      id: consulta.id,
-      data: { etapa: "Perdido", motivoPerdida: motivo, stage_id: null }
-    });
-    toast.success("Marcado como perdido");
+    try {
+      await updateMutation.mutateAsync({
+        id: consulta.id,
+        data: { etapa: "Perdido", motivoPerdida: motivo, stage_id: null }
+      });
+      toast.success("Marcado como perdido");
+    } catch (error) {
+      toast.error("No se pudo marcar como perdido");
+    }
   };
 
   const handleSeguimiento = async (consulta, dias) => {
