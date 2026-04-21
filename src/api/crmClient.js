@@ -1,4 +1,22 @@
 import { supabase, DATABASE_PREFIX } from "@/lib/supabaseClient";
+import {
+  validateContactNoDuplicates,
+  assertContactNoDuplicates,
+  findContactsWithSamePhone,
+  findContactsWithSameFullName,
+  normalizePhoneDigits,
+  normalizeNamePart,
+} from "@/utils/contactDuplicates";
+
+/** Client-side guards for duplicate contacts (use before Contacto.create / in forms). */
+export const contactDuplicateGuards = {
+  validateContactNoDuplicates,
+  assertContactNoDuplicates,
+  findContactsWithSamePhone,
+  findContactsWithSameFullName,
+  normalizePhoneDigits,
+  normalizeNamePart,
+};
 
 const ENTITY_TABLES = {
   User: `${DATABASE_PREFIX}_users`,
@@ -120,6 +138,7 @@ const auth = {
 
 export const crmClient = {
   entities,
+  contactDuplicateGuards,
   auth,
   users: {
     async inviteUser() {

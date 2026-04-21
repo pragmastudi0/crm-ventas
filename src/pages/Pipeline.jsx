@@ -87,21 +87,27 @@ export default function Pipeline() {
     toast.success(`Marcado como Perdido — ${motivo}`);
   };
 
-  const handleVentaCreada = async (ventaId) => {
-    if (selectedConsulta && workspace?.id) {
-      await updateDeal(workspace.id, selectedConsulta.id, {
-        etapa: "Concretado",
-        concretado: true,
-        stage_id: null,
-      });
-      queryClient.invalidateQueries({ queryKey: ['consultas-pipeline'] });
-      toast.success("Venta registrada y consulta marcada como Concretado");
+  const handleVentaCreada = async () => {
+    try {
+      if (selectedConsulta && workspace?.id) {
+        await updateMutation.mutateAsync({
+          id: selectedConsulta.id,
+          data: {
+            etapa: "Concretado",
+            concretado: true,
+            stage_id: null,
+          },
+        });
+        queryClient.invalidateQueries({ queryKey: ['consultas-pipeline', workspace?.id] });
+        toast.success("Venta registrada y consulta marcada como Concretado");
+      }
+      setShowVentaForm(false);
+      setSelectedConsulta(null);
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo marcar la consulta como Concretado");
+      throw error;
     }
-    if (ventaId) {
-      await crmClient.entities.Venta.update(ventaId, { estado: "Finalizada" });
-    }
-    setShowVentaForm(false);
-    setSelectedConsulta(null);
   };
 
   // Filtrar consultas

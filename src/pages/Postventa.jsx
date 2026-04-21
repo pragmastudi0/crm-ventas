@@ -80,7 +80,7 @@ export default function Postventa() {
     if (venta.contactoId && contactosMap[venta.contactoId]?.whatsapp) {
       return contactosMap[venta.contactoId].whatsapp;
     }
-    return venta.whatsappCliente || null;
+    return null;
   };
 
   const esCerrado = (v) => v.postventaEstado === "Cerrado";
