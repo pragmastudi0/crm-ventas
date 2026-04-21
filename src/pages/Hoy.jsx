@@ -90,7 +90,7 @@ export default function Hoy() {
     if (venta.contactoId && contactoById.get(venta.contactoId)?.whatsapp) {
       return contactoById.get(venta.contactoId).whatsapp;
     }
-    return venta.whatsappCliente || null;
+    return null;
   };
 
   const postventaActiva = ventasPostventa.filter((venta) =>
