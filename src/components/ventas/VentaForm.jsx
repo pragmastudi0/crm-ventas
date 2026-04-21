@@ -170,8 +170,9 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
 
     try {
       if (ventaExistente) {
+        const { whatsappCliente: _whatsappCliente, ...safeFormData } = formData;
         const ventaData = {
-          ...formData,
+          ...safeFormData,
           estado: finalizar ? "Finalizada" : formData.estado,
           costo, venta, comision, canje, ganancia,
           proveedorNombreSnapshot: formData.proveedorId
@@ -221,7 +222,6 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
           costo, comision, venta, canje, ganancia,
           moneda: formData.moneda,
           notas: formData.notas,
-          whatsappCliente: formData.whatsappCliente || null,
           workspace_id: workspace?.id,
           ...postventaFields,
         };
@@ -238,7 +238,6 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
           });
           await crmClient.entities.Venta.update(ventaCreada.id, {
             contactoId: contactoCreado.id,
-            whatsappCliente: formData.whatsappCliente,
           });
         }
 
