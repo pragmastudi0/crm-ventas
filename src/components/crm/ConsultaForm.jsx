@@ -1,16 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useWorkspace } from "@/components/context/WorkspaceContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { crmClient } from "@/api/crmClient";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { User, Package, DollarSign, Calendar, Plus } from "lucide-react";
+import { User, Package, Calendar, Plus } from "lucide-react";
 import moment from "moment";
 import { getNextBusinessDay } from "@/components/utils/dateUtils";
 import {
@@ -19,6 +18,14 @@ import {
   updateDeal,
   isConsultaSeguimientoInactive,
 } from "@/api/crmApi";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  validateContactNoDuplicates,
+  findContactsWithSamePhone,
+  findContactsWithSameFullName,
+  isMeaningfulPhoneDigits,
+  normalizePhoneDigits,
+} from "@/utils/contactDuplicates";
 
 const CATEGORIAS = ["iPhone", "Mac", "iPad", "AirPods", "Apple Watch", "Accesorios", "Otro"];
 const CANALES = ["Instagram", "WhatsApp", "MercadoLibre", "Referido", "Local", "Otro"];
@@ -92,8 +99,25 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
 
   const loadContactos = async () => {
     if (!workspace) return;
-    const data = await crmClient.entities.Contacto.filter({ workspace_id: workspace.id }, "-created_date", 100);
+    const data = await crmClient.entities.Contacto.filter({ workspace_id: workspace.id }, "-created_date", 500);
     setContactos(data);
+  };
+
+  const phoneDuplicateSuggestions = useMemo(() => {
+    if (!showNewContact || !newContact.whatsapp) return [];
+    return findContactsWithSamePhone(contactos, newContact.whatsapp);
+  }, [showNewContact, newContact.whatsapp, contactos]);
+
+  const fullNameDuplicateMatches = useMemo(() => {
+    if (!showNewContact) return [];
+    return findContactsWithSameFullName(contactos, newContact.nombre, newContact.apellido);
+  }, [showNewContact, newContact.nombre, newContact.apellido, contactos]);
+
+  const selectExistingContactFromSuggestion = (c) => {
+    setFormData((prev) => ({ ...prev, contactoId: c.id }));
+    setShowNewContact(false);
+    setNewContact({ nombre: "", apellido: "", whatsapp: "", ciudad: "", canalOrigen: "" });
+    toast.info(`Usando contacto existente: ${[c.nombre, c.apellido].filter(Boolean).join(" ")}`);
   };
 
   const handleCreateContact = async () => {
@@ -102,19 +126,44 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
       return;
     }
 
-    setLoading(true);
-    const created = await crmClient.entities.Contacto.create({
-      ...newContact,
+    const dupCheck = validateContactNoDuplicates({
+      existingContacts: contactos,
+      nombre: newContact.nombre,
+      apellido: newContact.apellido,
+      whatsapp: newContact.whatsapp,
       numeroTelefono: newContact.whatsapp,
-      workspace_id: workspace?.id
+      excludeContactId: undefined,
     });
-    
-    setContactos([created, ...contactos]);
-    setFormData({ ...formData, contactoId: created.id });
-    setShowNewContact(false);
-    setNewContact({ nombre: "", apellido: "", whatsapp: "", ciudad: "", canalOrigen: "" });
-    toast.success("Contacto creado");
-    setLoading(false);
+    if (dupCheck.ok === false) {
+      if (dupCheck.reason === "phone") {
+        toast.error(
+          "Ya existe un contacto con este número. Elegí «Usar este contacto» en la sugerencia o cambiá el número.",
+        );
+      } else {
+        toast.error(dupCheck.message);
+      }
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const created = await crmClient.entities.Contacto.create({
+        ...newContact,
+        numeroTelefono: newContact.whatsapp,
+        workspace_id: workspace?.id,
+      });
+
+      setContactos([created, ...contactos]);
+      setFormData({ ...formData, contactoId: created.id });
+      setShowNewContact(false);
+      setNewContact({ nombre: "", apellido: "", whatsapp: "", ciudad: "", canalOrigen: "" });
+      toast.success("Contacto creado");
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo crear el contacto");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -224,6 +273,54 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
               </>
             ) : (
               <div className="space-y-4 border rounded-xl p-4">
+                {isMeaningfulPhoneDigits(normalizePhoneDigits(newContact.whatsapp)) &&
+                  phoneDuplicateSuggestions.length > 0 && (
+                    <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+                      <AlertTitle>Contacto con el mismo teléfono</AlertTitle>
+                      <AlertDescription className="space-y-2">
+                        <p className="text-sm">
+                          Ya tenés uno o más contactos registrados con este número. Evitá duplicar: usá el
+                          existente o corregí el número si es otro cliente.
+                        </p>
+                        <ul className="list-disc pl-4 text-sm space-y-1">
+                          {phoneDuplicateSuggestions.map((c) => (
+                            <li key={c.id}>
+                              <span className="font-medium">
+                                {[c.nombre, c.apellido].filter(Boolean).join(" ")}
+                              </span>
+                              <span className="text-amber-800/80"> — {c.whatsapp || c.numeroTelefono}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="mt-1"
+                          onClick={() => selectExistingContactFromSuggestion(phoneDuplicateSuggestions[0])}
+                        >
+                          Usar este contacto
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                {fullNameDuplicateMatches.length > 0 && (
+                  <Alert variant="destructive" className="border-rose-200 bg-rose-50 text-rose-900 [&>svg]:text-rose-700">
+                    <AlertTitle>Mismo nombre y apellido</AlertTitle>
+                    <AlertDescription className="text-sm">
+                      Ya existe un contacto con esta combinación. No se puede crear otro igual; usá el contacto
+                      existente o ajustá nombre/apellido.
+                      <ul className="list-disc pl-4 mt-2 space-y-1">
+                        {fullNameDuplicateMatches.map((c) => (
+                          <li key={c.id}>
+                            {[c.nombre, c.apellido].filter(Boolean).join(" ")} — {c.whatsapp || c.numeroTelefono || "sin teléfono"}
+                          </li>
+                        ))}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-2">
                      <Label>Nombre *</Label>
@@ -278,7 +375,15 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
                   <Button type="button" variant="outline" onClick={() => setShowNewContact(false)}>
                     Cancelar
                   </Button>
-                  <Button type="button" onClick={handleCreateContact} disabled={loading}>
+                  <Button
+                    type="button"
+                    onClick={handleCreateContact}
+                    disabled={
+                      loading ||
+                      phoneDuplicateSuggestions.length > 0 ||
+                      fullNameDuplicateMatches.length > 0
+                    }
+                  >
                     Crear contacto
                   </Button>
                 </div>

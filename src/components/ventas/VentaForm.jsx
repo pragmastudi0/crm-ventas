@@ -11,6 +11,10 @@ import { DollarSign, TrendingUp, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { createPageUrl } from "@/utils";
 import { useWorkspace } from "@/components/context/WorkspaceContext";
+import {
+  findContactsWithSamePhone,
+  validateContactNoDuplicates,
+} from "@/utils/contactDuplicates";
 
 const MARKETPLACES = ["WhatsApp", "Instagram", "MercadoLibre", "Local", "Otro"];
 
@@ -200,11 +204,41 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
           }
         }
 
+        let resolvedContactId = formData.contactoId || null;
+
+        if (!resolvedContactId && formData.whatsappCliente?.trim()) {
+          const contactosWorkspace = await crmClient.entities.Contacto.filter(
+            { workspace_id: workspace.id },
+            "-created_date",
+            2000,
+          );
+          const byPhone = findContactsWithSamePhone(contactosWorkspace, formData.whatsappCliente);
+          if (byPhone.length) {
+            resolvedContactId = byPhone[0].id;
+            toast.info(
+              `Vinculado al contacto existente: ${[byPhone[0].nombre, byPhone[0].apellido].filter(Boolean).join(" ")}`,
+            );
+          } else {
+            const nameDup = validateContactNoDuplicates({
+              existingContacts: contactosWorkspace,
+              nombre: formData.nombreSnapshot,
+              apellido: formData.apellidoSnapshot,
+              whatsapp: formData.whatsappCliente,
+              numeroTelefono: formData.whatsappCliente,
+              excludeContactId: undefined,
+            });
+            if (nameDup.ok === false && nameDup.reason === "fullName") {
+              toast.error(nameDup.message);
+              return;
+            }
+          }
+        }
+
         const ventaData = {
           codigo: nuevoCodigo,
           estado: finalizar ? "Finalizada" : "Borrador",
           fecha: formData.fecha,
-          contactoId: formData.contactoId || null,
+          contactoId: resolvedContactId,
           consultaId: formData.consultaId || null,
           nombreSnapshot: formData.nombreSnapshot,
           apellidoSnapshot: formData.apellidoSnapshot || "",
@@ -228,13 +262,15 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
 
         const ventaCreada = await crmClient.entities.Venta.create(ventaData);
 
-        // Crear contacto automáticamente si se ingresó WhatsApp
-        if (formData.whatsappCliente && !formData.contactoId) {
+        // Crear contacto automáticamente si se ingresó WhatsApp y no hubo match por teléfono
+        if (formData.whatsappCliente?.trim() && !ventaCreada.contactoId) {
           const contactoCreado = await crmClient.entities.Contacto.create({
             nombre: formData.nombreSnapshot,
+            apellido: formData.apellidoSnapshot || "",
             whatsapp: formData.whatsappCliente,
+            numeroTelefono: formData.whatsappCliente,
             canalOrigen: formData.marketplace || "Otro",
-            workspace_id: workspace?.id
+            workspace_id: workspace?.id,
           });
           await crmClient.entities.Venta.update(ventaCreada.id, {
             contactoId: contactoCreado.id,
