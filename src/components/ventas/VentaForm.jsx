@@ -221,6 +221,7 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
           costo, comision, venta, canje, ganancia,
           moneda: formData.moneda,
           notas: formData.notas,
+          whatsappCliente: formData.whatsappCliente || null,
           workspace_id: workspace?.id,
           ...postventaFields,
         };
@@ -235,7 +236,10 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
             canalOrigen: formData.marketplace || "Otro",
             workspace_id: workspace?.id
           });
-          await crmClient.entities.Venta.update(ventaCreada.id, { contactoId: contactoCreado.id });
+          await crmClient.entities.Venta.update(ventaCreada.id, {
+            contactoId: contactoCreado.id,
+            whatsappCliente: formData.whatsappCliente,
+          });
         }
 
         toast.success(finalizar ? "Venta finalizada y postventa activada" : "Borrador guardado");

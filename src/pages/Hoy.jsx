@@ -11,6 +11,7 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import moment from "moment";
 import WhatsAppSender from "@/components/crm/WhatsAppSender";
+import PostventaWhatsAppSender from "@/components/crm/PostventaWhatsAppSender";
 import { toast } from "sonner";
 import { updateDeal, isConsultaSeguimientoInactive } from "@/api/crmApi";
 
@@ -23,9 +24,20 @@ const etapaColors = {
   Concretado: "bg-emerald-100 text-emerald-700",
 };
 
+const canalColors = {
+  WhatsApp: "bg-emerald-100 text-emerald-700",
+  Instagram: "bg-pink-100 text-pink-700",
+  MercadoLibre: "bg-yellow-100 text-yellow-700",
+  Referido: "bg-violet-100 text-violet-700",
+  Local: "bg-slate-200 text-slate-700",
+  Otro: "bg-indigo-100 text-indigo-700",
+};
+
 export default function Hoy() {
   const [showWhatsApp, setShowWhatsApp] = useState(false);
+  const [showPostventaWhatsApp, setShowPostventaWhatsApp] = useState(false);
   const [selectedConsulta, setSelectedConsulta] = useState(null);
+  const [selectedVenta, setSelectedVenta] = useState(null);
   const queryClient = useQueryClient();
   const { workspace } = useWorkspace();
 
@@ -34,6 +46,18 @@ export default function Hoy() {
     queryFn: () => workspace ? crmClient.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 1000) : [],
     enabled: !!workspace
   });
+  const { data: contactos = [] } = useQuery({
+    queryKey: ['contactos-hoy', workspace?.id],
+    queryFn: () => workspace ? crmClient.entities.Contacto.filter({ workspace_id: workspace.id }, "-created_date", 1000) : [],
+    enabled: !!workspace
+  });
+  const { data: ventasPostventa = [] } = useQuery({
+    queryKey: ['ventas-postventa-hoy', workspace?.id],
+    queryFn: () => workspace ? crmClient.entities.Venta.filter({ workspace_id: workspace.id, estado: "Finalizada" }, "-fecha", 1000) : [],
+    enabled: !!workspace
+  });
+
+  const contactoById = new Map(contactos.map((contacto) => [contacto.id, contacto]));
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => {
@@ -43,6 +67,13 @@ export default function Hoy() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultas-hoy'] });
       toast.success("Actualizado");
+    }
+  });
+  const updateVentaMutation = useMutation({
+    mutationFn: ({ id, data }) => crmClient.entities.Venta.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ventas-postventa-hoy', workspace?.id] });
+      toast.success("Postventa actualizada");
     }
   });
 
@@ -55,24 +86,43 @@ export default function Hoy() {
     return true;
   };
 
-  const hoy = consultas.filter((c) => {
-    if (!seguimientoActivo(c)) return false;
-    return moment(c.proximoSeguimiento).isSame(today, "day");
-  });
+  const getVentaWhatsapp = (venta) => {
+    if (venta.contactoId && contactoById.get(venta.contactoId)?.whatsapp) {
+      return contactoById.get(venta.contactoId).whatsapp;
+    }
+    return venta.whatsappCliente || null;
+  };
 
-  const vencidos = consultas.filter((c) => {
-    if (!seguimientoActivo(c)) return false;
-    return moment(c.proximoSeguimiento).isBefore(today, "day");
-  });
+  const postventaActiva = ventasPostventa.filter((venta) =>
+    venta.postventaActiva === true &&
+    venta.postventaEstado !== "Cerrado" &&
+    venta.proximoSeguimientoPostventa &&
+    moment(venta.proximoSeguimientoPostventa).isValid()
+  );
 
-  const proximos3d = consultas.filter((c) => {
-    if (!seguimientoActivo(c)) return false;
-    const fecha = c.proximoSeguimiento;
-    return (
-      moment(fecha).isAfter(today, "day") &&
-      moment(fecha).isBefore(today.clone().add(3, "days"), "day")
-    );
-  });
+  const seguimientosUnificados = [
+    ...consultas
+      .filter((consulta) => seguimientoActivo(consulta))
+      .map((consulta) => ({
+        kind: "consulta",
+        id: consulta.id,
+        fecha: consulta.proximoSeguimiento,
+        consulta,
+      })),
+    ...postventaActiva.map((venta) => ({
+      kind: "postventa",
+      id: venta.id,
+      fecha: venta.proximoSeguimientoPostventa,
+      venta,
+    })),
+  ];
+
+  const hoy = seguimientosUnificados.filter((item) => moment(item.fecha).isSame(today, "day"));
+  const vencidos = seguimientosUnificados.filter((item) => moment(item.fecha).isBefore(today, "day"));
+  const proximos3d = seguimientosUnificados.filter((item) => (
+    moment(item.fecha).isAfter(today, "day") &&
+    moment(item.fecha).isBefore(today.clone().add(3, "days"), "day")
+  ));
 
   const handleWhatsApp = (consulta) => {
     setSelectedConsulta(consulta);
@@ -86,25 +136,53 @@ export default function Hoy() {
       data: { proximoSeguimiento: nuevaFecha },
     });
   };
+  const handlePostventaWhatsApp = (venta) => {
+    setSelectedVenta(venta);
+    setShowPostventaWhatsApp(true);
+  };
+  const handlePostventaRealizada = async (venta) => {
+    await updateVentaMutation.mutateAsync({
+      id: venta.id,
+      data: {
+        postventaUltimoContacto: new Date().toISOString(),
+        postventaEstado: "Cerrado",
+        postventaActiva: false,
+        proximoSeguimientoPostventa: null,
+      },
+    });
+  };
 
-  const ConsultaItem = ({ consulta, tipo }) => {
-    const fechaMostrar = consulta.proximoSeguimiento;
+  const SeguimientoItem = ({ item, tipo }) => {
+    const isPostventa = item.kind === "postventa";
+    const consulta = item.consulta;
+    const venta = item.venta;
+    const fechaMostrar = item.fecha;
+    const canalOrigen = isPostventa
+      ? (venta.marketplace || "Sin canal")
+      : (consulta.canalOrigen || contactoById.get(consulta.contactoId)?.canalOrigen || "Sin canal");
     return (
     <Card className="hover:shadow-md transition-all">
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <h3 className="font-semibold text-slate-900">{consulta.contactoNombre}</h3>
-              <Badge className={etapaColors[consulta.etapa] || "bg-slate-100 text-slate-700"}>
-                {consulta.etapa}
+              <h3 className="font-semibold text-slate-900">{isPostventa ? venta.nombreSnapshot : consulta.contactoNombre}</h3>
+              {isPostventa ? (
+                <Badge className="bg-violet-100 text-violet-700">Postventa</Badge>
+              ) : (
+                <Badge className={etapaColors[consulta.etapa] || "bg-slate-100 text-slate-700"}>
+                  {consulta.etapa}
+                </Badge>
+              )}
+              <Badge className={canalColors[canalOrigen] || "bg-slate-100 text-slate-700"}>
+                {canalOrigen}
               </Badge>
             </div>
-            <p className="text-sm text-slate-600 mb-1">{consulta.productoConsultado}</p>
-            {consulta.variante && (
+            <p className="text-sm text-slate-600 mb-1">{isPostventa ? (venta.productoSnapshot || venta.modelo || "-") : consulta.productoConsultado}</p>
+            {!isPostventa && consulta.variante && (
               <p className="text-xs text-slate-400">{consulta.variante}</p>
             )}
-            {consulta.precioCotizado && (
+            {!isPostventa && consulta.precioCotizado && (
               <p className="text-sm font-medium text-slate-900 mt-2">
                 {consulta.moneda === "USD" ? "US$" : "$"} {consulta.precioCotizado.toLocaleString()}
               </p>
@@ -124,15 +202,16 @@ export default function Hoy() {
           <div className="flex flex-col gap-2 ml-4">
             <Button
               size="sm"
-              onClick={() => handleWhatsApp(consulta)}
+              onClick={() => (isPostventa ? handlePostventaWhatsApp(venta) : handleWhatsApp(consulta))}
               className="bg-[#25D366] hover:bg-[#20bd5a] text-white"
+              disabled={isPostventa && !getVentaWhatsapp(venta)}
             >
               <MessageCircle className="w-4 h-4" />
             </Button>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => handleMarcarCompletado(consulta)}
+              onClick={() => (isPostventa ? handlePostventaRealizada(venta) : handleMarcarCompletado(consulta))}
             >
               <CheckCircle2 className="w-4 h-4" />
             </Button>
@@ -208,7 +287,7 @@ export default function Hoy() {
 
           <TabsContent value="vencidos" className="space-y-3 mt-4">
             {vencidos.length > 0 ? (
-              vencidos.map(c => <ConsultaItem key={c.id} consulta={c} tipo="vencido" />)
+              vencidos.map(item => <SeguimientoItem key={`${item.kind}-${item.id}`} item={item} tipo="vencido" />)
             ) : (
               <Card>
                 <CardContent className="text-center py-12">
@@ -221,7 +300,7 @@ export default function Hoy() {
 
           <TabsContent value="hoy" className="space-y-3 mt-4">
             {hoy.length > 0 ? (
-              hoy.map(c => <ConsultaItem key={c.id} consulta={c} tipo="hoy" />)
+              hoy.map(item => <SeguimientoItem key={`${item.kind}-${item.id}`} item={item} tipo="hoy" />)
             ) : (
               <Card>
                 <CardContent className="text-center py-12">
@@ -234,7 +313,7 @@ export default function Hoy() {
 
           <TabsContent value="proximos" className="space-y-3 mt-4">
             {proximos3d.length > 0 ? (
-              proximos3d.map(c => <ConsultaItem key={c.id} consulta={c} tipo="proximo" />)
+              proximos3d.map(item => <SeguimientoItem key={`${item.kind}-${item.id}`} item={item} tipo="proximo" />)
             ) : (
               <Card>
                 <CardContent className="text-center py-12">
@@ -252,6 +331,16 @@ export default function Hoy() {
         onOpenChange={setShowWhatsApp}
         consulta={selectedConsulta}
         onMessageSent={refetch}
+      />
+      <PostventaWhatsAppSender
+        open={showPostventaWhatsApp}
+        onOpenChange={setShowPostventaWhatsApp}
+        venta={selectedVenta}
+        contactoWhatsapp={selectedVenta ? getVentaWhatsapp(selectedVenta) : null}
+        workspaceId={workspace?.id}
+        onMessageSent={() => {
+          queryClient.invalidateQueries({ queryKey: ['ventas-postventa-hoy', workspace?.id] });
+        }}
       />
     </div>
   );

@@ -131,6 +131,7 @@ export default function ConsultaForm({ open, onOpenChange, consulta, onSave }) {
       ...formData,
       contactoNombre: [contacto?.nombre, contacto?.apellido].filter(Boolean).join(" "),
       contactoWhatsapp: contacto?.whatsapp,
+      canalOrigen: formData.canalOrigen || contacto?.canalOrigen || "",
       presupuestoMax: formData.presupuestoMax ? Number(formData.presupuestoMax) : null,
       precioCotizado: formData.precioCotizado ? Number(formData.precioCotizado) : null,
       fechaConsulta: consulta?.fechaConsulta || moment().format("YYYY-MM-DD"),

@@ -10,6 +10,24 @@ import moment from "moment";
 function pct(n, d) { return d > 0 ? ((n / d) * 100).toFixed(1) : "0.0"; }
 function usd(n) { return `US$ ${(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`; }
 function daysLeftInMonth() { const now = moment(); return now.daysInMonth() - now.date(); }
+function normalizeChannel(channelValue) {
+  const raw = String(channelValue || "").trim().toLowerCase();
+  if (!raw) return "Sin especificar";
+  if (raw.includes("whatsapp")) return "WhatsApp";
+  if (raw.includes("instagram")) return "Instagram";
+  if (raw.includes("mercadolibre") || raw.includes("mercado libre")) return "MercadoLibre";
+  if (raw.includes("referido")) return "Referido";
+  if (raw.includes("local")) return "Local";
+  if (raw.includes("otro")) return "Otro";
+  return "Sin especificar";
+}
+function deriveSaleStatus(consulta) {
+  if (!consulta) return "Pendiente";
+  const etapa = String(consulta.etapa || "").toLowerCase();
+  if (consulta.concretado === true || /concretad|ganad|won|closed won/.test(etapa)) return "Concretada";
+  if (/perdid|lost|closed lost/.test(etapa)) return "Perdida";
+  return "Pendiente";
+}
 
 function KPICard({ label, value, sub, color }) {
   return (
@@ -38,14 +56,14 @@ function Section({ title, icon: Icon, children, action }) {
   );
 }
 
-function RankRow({ rank, name, value, sub, bar, barColor, badge }) {
+function RankRow({ rank, name, value, sub, bar, barColor, badge, badgeClassName }) {
   return (
     <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
       <span className="text-sm font-bold min-w-[20px]" style={{ color: rank === 1 ? "#f59e0b" : "#94a3b8" }}>#{rank}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium text-slate-700 truncate">{name}</p>
-          {badge && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 rounded px-1.5 py-0.5 shrink-0">{badge}</span>}
+          {badge && <span className={`text-xs border rounded px-1.5 py-0.5 shrink-0 ${badgeClassName || "bg-amber-50 text-amber-600 border-amber-200"}`}>{badge}</span>}
         </div>
         {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
         {bar !== undefined && (
@@ -103,18 +121,28 @@ function ActividadContacto({ workspace }) {
         : [],
     enabled: !!workspace
   });
+  const { data: consultas = [] } = useQuery({
+    queryKey: ["ib-actividad-consultas", workspace?.id],
+    queryFn: () =>
+      workspace
+        ? crmClient.entities.Consulta.filter({ workspace_id: workspace.id }, "-created_date", 2000)
+        : [],
+    enabled: !!workspace
+  });
+
+  const consultaById = new Map(consultas.map((consulta) => [consulta.id, consulta]));
 
   const todosLosContactos = [
     ...envios.map((e) => ({
       fecha: e.created_date,
       consultaId: e.consultaId,
-      nombre: e.contactoNombre || e.contactoId || "Contacto",
+      nombre: e.contactoNombre || consultaById.get(e.consultaId)?.contactoNombre || "Sin nombre",
       tipo: "whatsapp"
     })),
     ...mensajes.map((m) => ({
       fecha: m.created_date,
       consultaId: m.consultaId,
-      nombre: m.contactoNombre || m.contactoId || "Contacto",
+      nombre: m.contactoNombre || consultaById.get(m.consultaId)?.contactoNombre || "Sin nombre",
       tipo: "seguimiento"
     }))
   ].filter((item) => item.fecha);
@@ -138,18 +166,24 @@ function ActividadContacto({ workspace }) {
     if (!c.consultaId) return;
     recontactosPorConsulta[c.consultaId] = recontactosPorConsulta[c.consultaId] || {
       nombre: c.nombre,
-      count: 0
+      count: 0,
+      saleStatus: deriveSaleStatus(consultaById.get(c.consultaId))
     };
     recontactosPorConsulta[c.consultaId].count++;
   });
 
   const topRecontactos = Object.entries(recontactosPorConsulta)
-    .map(([id, d]) => ({ id, nombre: d.nombre, count: d.count }))
+    .map(([id, d]) => ({ id, nombre: d.nombre, count: d.count, saleStatus: d.saleStatus }))
     .filter(r => r.count > 1)
     .sort((a, b) => b.count - a.count)
-    .slice(0, 7);
+    .slice(0, 5);
 
   const maxRecontacto = topRecontactos[0]?.count || 1;
+  const statusBadgeStyles = {
+    Concretada: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    Pendiente: "bg-amber-50 text-amber-700 border-amber-200",
+    Perdida: "bg-rose-50 text-rose-700 border-rose-200",
+  };
 
   // ── Tipo de contacto breakdown ──
   const porTipo = [
@@ -259,10 +293,11 @@ function ActividadContacto({ workspace }) {
               key={r.id}
               rank={i + 1}
               name={r.nombre}
-              value={`${r.count} contactos`}
+              value={`${r.count} recontactos`}
               bar={(r.count / maxRecontacto) * 100}
               barColor={i === 0 ? "#6366f1" : "#94a3b8"}
-              badge={i === 0 ? "TOP" : null}
+              badge={r.saleStatus}
+              badgeClassName={statusBadgeStyles[r.saleStatus]}
             />
           ))}
         </div>
@@ -468,20 +503,22 @@ export default function InteligenciaNegocio() {
     .sort((a, b) => b.ganancia - a.ganancia);
   const maxProv = topProveedores[0]?.ganancia || 1;
 
+  const consultaById = new Map(consultas30.map((consulta) => [consulta.id, consulta]));
   const canalMap = {};
-  consultas30.forEach(c => {
-    const k = c.canalOrigen || "Sin especificar";
-    if (!canalMap[k]) canalMap[k] = { consultas: 0, concretados: 0, ganancia: 0 };
-    canalMap[k].consultas++;
-    if (c.etapa === "Concretado") canalMap[k].concretados++;
+  consultas30.forEach((consulta) => {
+    const channel = normalizeChannel(consulta.canalOrigen);
+    if (!canalMap[channel]) canalMap[channel] = { consultas: 0, ventas: 0, ganancia: 0 };
+    canalMap[channel].consultas++;
   });
-  ventas30.forEach(v => {
-    const k = v.marketplace || "Sin especificar";
-    if (!canalMap[k]) canalMap[k] = { consultas: 0, concretados: 0, ganancia: 0 };
-    canalMap[k].ganancia += v.ganancia || 0;
+  ventas30.forEach((venta) => {
+    const consultaCanal = consultaById.get(venta.consultaId)?.canalOrigen;
+    const channel = normalizeChannel(consultaCanal || venta.marketplace);
+    if (!canalMap[channel]) canalMap[channel] = { consultas: 0, ventas: 0, ganancia: 0 };
+    canalMap[channel].ventas++;
+    canalMap[channel].ganancia += venta.ganancia || 0;
   });
   const canales = Object.entries(canalMap)
-    .map(([name, d]) => ({ name, ventas: d.concretados, conversion: pct(d.concretados, d.consultas), ganancia: d.ganancia }))
+    .map(([name, d]) => ({ name, ventas: d.ventas, conversion: pct(d.ventas, d.consultas), ganancia: d.ganancia }))
     .sort((a, b) => b.ganancia - a.ganancia);
   const maxCanal = canales[0]?.ganancia || 1;
 
