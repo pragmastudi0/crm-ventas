@@ -18,7 +18,7 @@ const ENTITY_TABLES = {
 };
 
 const normalizeSort = (sort) => {
-  if (!sort) return { column: "created_at", ascending: false };
+  if (!sort) return { column: "created_date", ascending: false };
   if (sort.startsWith("-")) return { column: sort.slice(1), ascending: false };
   return { column: sort, ascending: true };
 };
@@ -37,7 +37,7 @@ const createEntityApi = (entityName) => {
   if (!tableName) throw new Error(`Missing table mapping for entity ${entityName}`);
 
   return {
-    async filter(filter = {}, sort = "-created_at", limit = 1000) {
+    async filter(filter = {}, sort = "-created_date", limit = 1000) {
       const { column, ascending } = normalizeSort(sort);
       let query = supabase.from(tableName).select("*").limit(limit);
       query = applyFilters(query, filter);
@@ -45,7 +45,7 @@ const createEntityApi = (entityName) => {
       if (error) throw error;
       return data || [];
     },
-    async list(sort = "-created_at", limit = 1000) {
+    async list(sort = "-created_date", limit = 1000) {
       const { column, ascending } = normalizeSort(sort);
       const { data, error } = await supabase
         .from(tableName)
