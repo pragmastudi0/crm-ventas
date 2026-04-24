@@ -1,14 +1,15 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { 
   LayoutDashboard, Kanban, List, Users, MessageSquare, Calendar,
-  Menu, X, ChevronRight, CheckCircle2, PanelLeftClose, PanelLeftOpen, BarChart3
+  Menu, X, ChevronRight, CheckCircle2, PanelLeftClose, PanelLeftOpen, BarChart3, LogOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Toaster } from "sonner";
-import { WorkspaceProvider, useWorkspace } from "@/components/context/WorkspaceContext";
+import { WorkspaceProvider } from "@/components/context/WorkspaceContext";
+import { useAuth } from "@/lib/AuthContext";
 
 const NAV_ITEMS = [
   { name: "Home", icon: LayoutDashboard, page: "Home" },
@@ -23,57 +24,17 @@ const NAV_ITEMS = [
   { name: "Ajustes", icon: Users, page: "Ajustes" },
 ];
 
-function WorkspaceGuard({ children }) {
-  const { workspace, workspaceLoading, workspaceError, refetchWorkspace } = useWorkspace();
-
-  if (workspaceLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (workspaceError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="max-w-md w-full rounded-xl border border-red-200 bg-red-50 p-5 space-y-4">
-          <h2 className="text-base font-semibold text-red-700">Error de workspace</h2>
-          <p className="text-sm text-red-600">{workspaceError}</p>
-          <Button variant="outline" className="w-full border-red-300" onClick={() => refetchWorkspace()}>
-            Reintentar
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!workspace) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="max-w-md w-full rounded-xl border border-amber-200 bg-amber-50 p-5 space-y-4">
-          <h2 className="text-base font-semibold text-amber-900">No hay workspace activo</h2>
-          <p className="text-sm text-amber-800">
-            No se pudo resolver un workspace para tu sesión. Revisa la consola del navegador o vuelve a intentar.
-          </p>
-          <Button variant="outline" className="w-full border-amber-300" onClick={() => refetchWorkspace()}>
-            Reintentar
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return children;
-}
-
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    void logout();
+  };
 
   return (
     <WorkspaceProvider>
-      <WorkspaceGuard>
       <div className="min-h-screen bg-slate-50">
       <Toaster position="top-right" richColors />
       
@@ -161,10 +122,22 @@ export default function Layout({ children, currentPageName }) {
         {/* Quick Stats */}
         {!sidebarCollapsed && (
           <div className="p-4 border-t border-slate-100">
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-4 text-white">
+            <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-4 text-white flex flex-col">
               <p className="text-xs text-slate-400 mb-1">Mini CRM</p>
               <p className="text-sm font-medium">Seguimiento de ventas</p>
               <p className="text-xs text-slate-400 mt-2">Altatech · Tecnología</p>
+              <div className="mt-3 flex justify-start">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleLogout}
+                  className="h-8 px-2 text-slate-300 hover:text-white hover:bg-white/10 justify-start"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Cerrar sesión
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -175,7 +148,6 @@ export default function Layout({ children, currentPageName }) {
         {children}
       </main>
       </div>
-      </WorkspaceGuard>
     </WorkspaceProvider>
   );
 }
