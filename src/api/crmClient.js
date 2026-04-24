@@ -1,22 +1,5 @@
 import { supabase, DATABASE_PREFIX } from "@/lib/supabaseClient";
-import {
-  validateContactNoDuplicates,
-  assertContactNoDuplicates,
-  findContactsWithSamePhone,
-  findContactsWithSameFullName,
-  normalizePhoneDigits,
-  normalizeNamePart,
-} from "@/utils/contactDuplicates";
-
-/** Client-side guards for duplicate contacts (use before Contacto.create / in forms). */
-export const contactDuplicateGuards = {
-  validateContactNoDuplicates,
-  assertContactNoDuplicates,
-  findContactsWithSamePhone,
-  findContactsWithSameFullName,
-  normalizePhoneDigits,
-  normalizeNamePart,
-};
+import { appParams } from "@/lib/app-params";
 
 const ENTITY_TABLES = {
   User: `${DATABASE_PREFIX}_users`,
@@ -34,20 +17,10 @@ const ENTITY_TABLES = {
   WorkspaceMember: `${DATABASE_PREFIX}_workspace_members`
 };
 
-/** Nombres de orden usados en el front → columnas reales en Postgres/Supabase */
-const SORT_COLUMN_ALIASES = {
-  created_date: "created_date",
-  updated_date: "updated_date",
-  created_at: "created_date",
-  updated_at: "updated_date"
-};
-
 const normalizeSort = (sort) => {
   if (!sort) return { column: "created_date", ascending: false };
-  const descending = sort.startsWith("-");
-  const raw = descending ? sort.slice(1) : sort;
-  const column = SORT_COLUMN_ALIASES[raw] ?? raw;
-  return { column, ascending: !descending };
+  if (sort.startsWith("-")) return { column: sort.slice(1), ascending: false };
+  return { column: sort, ascending: true };
 };
 
 const applyFilters = (query, filter = {}) => {
@@ -132,13 +105,12 @@ const auth = {
     if (error) throw error;
   },
   redirectToLogin() {
-    window.location.href = "/login";
+    window.location.href = appParams.loginUrl;
   }
 };
 
 export const crmClient = {
   entities,
-  contactDuplicateGuards,
   auth,
   users: {
     async inviteUser() {
