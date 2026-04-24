@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { appParams } from '@/lib/app-params';
 
 const AuthContext = createContext();
 
@@ -45,8 +46,6 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(Boolean(sessionData?.session && currentUser));
       if (!sessionData?.session || !currentUser) {
         setAuthError({ type: "auth_required", message: "Authentication required" });
-      } else {
-        setAuthError(null);
       }
       setIsLoadingAuth(false);
     } catch (error) {
@@ -69,11 +68,15 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
 
     await supabase.auth.signOut();
-    if (shouldRedirect) window.location.href = "/login";
+    if (shouldRedirect) {
+      window.location.href = appParams.loginUrl;
+    }
   };
 
   const navigateToLogin = () => {
-    window.location.href = "/login";
+    if (window.location.pathname !== appParams.loginUrl) {
+      window.location.href = appParams.loginUrl;
+    }
   };
 
   useEffect(() => {
