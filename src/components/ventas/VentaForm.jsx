@@ -11,6 +11,7 @@ import { DollarSign, TrendingUp, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { createPageUrl } from "@/utils";
 import { useWorkspace } from "@/components/context/WorkspaceContext";
+import { Link } from "react-router-dom";
 
 const MARKETPLACES = ["WhatsApp", "Instagram", "MercadoLibre", "Local", "Otro"];
 
