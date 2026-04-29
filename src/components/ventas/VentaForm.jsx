@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { crmClient } from "@/api/crmClient";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -11,10 +11,7 @@ import { DollarSign, TrendingUp, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { createPageUrl } from "@/utils";
 import { useWorkspace } from "@/components/context/WorkspaceContext";
-import {
-  findContactsWithSamePhone,
-  validateContactNoDuplicates,
-} from "@/utils/contactDuplicates";
+import { Link } from "react-router-dom";
 
 const MARKETPLACES = ["WhatsApp", "Instagram", "MercadoLibre", "Local", "Otro"];
 
@@ -57,6 +54,23 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
   });
 
   const [gananciaCalculada, setGananciaCalculada] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const lastSubmitRef = useRef({ signature: null, timestamp: 0 });
+
+  const normalizeText = (value) => (value || "").toString().trim().toLowerCase();
+  const normalizeNumber = (value) => {
+    if (value === null || value === undefined || value === "") return "";
+    const parsed = Number.parseFloat(value);
+    return Number.isNaN(parsed) ? "" : parsed.toFixed(2);
+  };
+  const buildVentaSignature = (source) => [
+    source.workspace_id || "",
+    normalizeText(source.nombreSnapshot),
+    normalizeText(source.apellidoSnapshot),
+    source.fecha || "",
+    normalizeNumber(source.venta),
+    source.consultaId || "",
+  ].join("|");
 
   const { data: proveedores = [] } = useQuery({
     queryKey: ['proveedores-activos', workspace?.id],
@@ -144,10 +158,7 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
   }, [formData.costo, formData.venta, formData.comision, formData.canje]);
 
   const handleSubmit = async (finalizar = false) => {
-    if (!workspace?.id) {
-      toast.error("Workspace no disponible");
-      return;
-    }
+    if (isSubmitting) return;
     if (!formData.nombreSnapshot) {
       toast.error("El nombre del cliente es obligatorio");
       return;
@@ -172,11 +183,25 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
       postventaUltimoContacto: null,
     } : {};
 
+    const submissionSignature = buildVentaSignature({
+      ...formData,
+      workspace_id: workspace?.id,
+    });
+    const now = Date.now();
+    if (
+      !ventaExistente &&
+      lastSubmitRef.current.signature === submissionSignature &&
+      now - lastSubmitRef.current.timestamp < 10000
+    ) {
+      toast.error("Esta venta ya se guardó recientemente.");
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
       if (ventaExistente) {
-        const { whatsappCliente: _whatsappCliente, ...safeFormData } = formData;
         const ventaData = {
-          ...safeFormData,
+          ...formData,
           estado: finalizar ? "Finalizada" : formData.estado,
           costo, venta, comision, canje, ganancia,
           proveedorNombreSnapshot: formData.proveedorId
@@ -190,11 +215,25 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
         onVentaCreada?.();
         onOpenChange(false);
       } else {
-        const ventas = await crmClient.entities.Venta.filter(
-          { workspace_id: workspace.id },
+        const ventasRecientes = await crmClient.entities.Venta.filter(
+          { workspace_id: workspace?.id },
           "-created_date",
-          1
+          200
         );
+        const duplicateFound = ventasRecientes.some((existingVenta) => {
+          const existingSignature = buildVentaSignature({
+            ...existingVenta,
+            workspace_id: existingVenta.workspace_id,
+          });
+          return existingSignature === submissionSignature;
+        });
+
+        if (duplicateFound) {
+          toast.error("Ya existe una venta con esos datos.");
+          return;
+        }
+
+        const ventas = await crmClient.entities.Venta.list("-created_date", 1);
         let nuevoCodigo = `V-${new Date().getFullYear()}-000001`;
         if (ventas.length > 0 && ventas[0].codigo) {
           const partes = ventas[0].codigo.split('-');
@@ -204,41 +243,11 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
           }
         }
 
-        let resolvedContactId = formData.contactoId || null;
-
-        if (!resolvedContactId && formData.whatsappCliente?.trim()) {
-          const contactosWorkspace = await crmClient.entities.Contacto.filter(
-            { workspace_id: workspace.id },
-            "-created_date",
-            2000,
-          );
-          const byPhone = findContactsWithSamePhone(contactosWorkspace, formData.whatsappCliente);
-          if (byPhone.length) {
-            resolvedContactId = byPhone[0].id;
-            toast.info(
-              `Vinculado al contacto existente: ${[byPhone[0].nombre, byPhone[0].apellido].filter(Boolean).join(" ")}`,
-            );
-          } else {
-            const nameDup = validateContactNoDuplicates({
-              existingContacts: contactosWorkspace,
-              nombre: formData.nombreSnapshot,
-              apellido: formData.apellidoSnapshot,
-              whatsapp: formData.whatsappCliente,
-              numeroTelefono: formData.whatsappCliente,
-              excludeContactId: undefined,
-            });
-            if (nameDup.ok === false && nameDup.reason === "fullName") {
-              toast.error(nameDup.message);
-              return;
-            }
-          }
-        }
-
         const ventaData = {
           codigo: nuevoCodigo,
           estado: finalizar ? "Finalizada" : "Borrador",
           fecha: formData.fecha,
-          contactoId: resolvedContactId,
+          contactoId: formData.contactoId || null,
           consultaId: formData.consultaId || null,
           nombreSnapshot: formData.nombreSnapshot,
           apellidoSnapshot: formData.apellidoSnapshot || "",
@@ -261,20 +270,17 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
         };
 
         const ventaCreada = await crmClient.entities.Venta.create(ventaData);
+        lastSubmitRef.current = { signature: submissionSignature, timestamp: Date.now() };
 
-        // Crear contacto automáticamente si se ingresó WhatsApp y no hubo match por teléfono
-        if (formData.whatsappCliente?.trim() && !ventaCreada.contactoId) {
+        // Crear contacto automáticamente si se ingresó WhatsApp
+        if (formData.whatsappCliente && !formData.contactoId) {
           const contactoCreado = await crmClient.entities.Contacto.create({
             nombre: formData.nombreSnapshot,
-            apellido: formData.apellidoSnapshot || "",
             whatsapp: formData.whatsappCliente,
-            numeroTelefono: formData.whatsappCliente,
             canalOrigen: formData.marketplace || "Otro",
-            workspace_id: workspace?.id,
+            workspace_id: workspace?.id
           });
-          await crmClient.entities.Venta.update(ventaCreada.id, {
-            contactoId: contactoCreado.id,
-          });
+          await crmClient.entities.Venta.update(ventaCreada.id, { contactoId: contactoCreado.id });
         }
 
         toast.success(finalizar ? "Venta finalizada y postventa activada" : "Borrador guardado");
@@ -284,6 +290,8 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
     } catch (error) {
       toast.error("Error al guardar la venta");
       console.error(error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -440,10 +448,12 @@ export default function VentaForm({ open, onOpenChange, consulta, onVentaCreada,
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button variant="outline" onClick={() => handleSubmit(false)}>Guardar Borrador</Button>
-          <Button onClick={() => handleSubmit(true)}>
-            {ventaExistente ? "Actualizar y Finalizar" : "Finalizar Venta"}
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
+          <Button variant="outline" onClick={() => handleSubmit(false)} disabled={isSubmitting}>
+            {isSubmitting ? "Guardando..." : "Guardar Borrador"}
+          </Button>
+          <Button onClick={() => handleSubmit(true)} disabled={isSubmitting}>
+            {isSubmitting ? "Guardando..." : (ventaExistente ? "Actualizar y Finalizar" : "Finalizar Venta")}
           </Button>
         </DialogFooter>
       </DialogContent>
